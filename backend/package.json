@@ -1,0 +1,33 @@
+{
+  "name": "backend-gestion-docentes",
+  "version": "1.0.0",
+  "description": "API RESTful con Node.js, Express y Sequelize ORM para la gestión de docentes y asignaturas",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "nodemon src/server.js",
+    "seed": "node src/seeders/seed.js",
+    "test": "node test-suite.js"
+  },
+  "keywords": [
+    "nodejs",
+    "express",
+    "sequelize",
+    "restful-api",
+    "docentes",
+    "asignaturas"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "cors": "^2.8.6",
+    "dotenv": "^18.0.9",
+    "express": "^5.3.0",
+    "morgan": "^1.12.1",
+    "sequelize": "^6.37.8",
+    "sqlite3": "^6.0.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.14"
+  }
+}

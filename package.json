@@ -1,0 +1,20 @@
+{
+  "name": "sistema-gestion-docentes-fullstack",
+  "version": "1.0.0",
+  "description": "Sistema de Gestión de Docentes y Asignaturas - Backend (Node.js/Express/Sequelize) y Frontend (Vue.js 3)",
+  "scripts": {
+    "start:backend": "npm --prefix backend start",
+    "dev:backend": "npm --prefix backend run dev",
+    "seed:backend": "npm --prefix backend run seed",
+    "test:backend": "npm --prefix backend test"
+  },
+  "keywords": [
+    "nodejs",
+    "express",
+    "sequelize",
+    "vue3",
+    "javascript"
+  ],
+  "author": "",
+  "license": "ISC"
+}
