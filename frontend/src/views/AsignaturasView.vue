@@ -2,30 +2,43 @@
 // Importo utilidades reactivas y ciclo de vida desde Vue
 import { ref, computed, onMounted } from 'vue';
 
-// Importo el servicio de asignaturas
+// Importo los servicios de asignaturas y de autenticación
 import { asignaturaService } from '../services/asignaturaService';
+import { authService } from '../services/authService';
 
 // Importo componentes modulares
 import AsignaturaModal from '../components/AsignaturaModal.vue';
+import AsignaturaDetalleModal from '../components/AsignaturaDetalleModal.vue';
+import ConfirmModal from '../components/ConfirmModal.vue';
 import ToastNotification from '../components/ToastNotification.vue';
 
-// Defino el estado reactivo principal
+// Estado reactivo principal
 const asignaturas = ref([]);
 const cargando = ref(true);
 const filtroBusqueda = ref('');
+const filtroEstado = ref('todos'); // 'todos', 'activas', 'inactivas'
 
-// Estado para el modal de creación de asignaturas
-const modalVisible = ref(false);
+// Modales
+const modalFormVisible = ref(false);
+const modoEdicion = ref(false);
+const asignaturaSeleccionada = ref(null);
 const guardandoAsignatura = ref(false);
 
-// Estado de la notificación Toast
+const modalDetalleVisible = ref(false);
+const asignaturaDetalle = ref(null);
+
+const modalConfirmVisible = ref(false);
+const asignaturaAEliminar = ref(null);
+const eliminandoAsignatura = ref(false);
+
+// Notificaciones Toast
 const toast = ref({
   visible: false,
   mensaje: '',
   tipo: 'success',
 });
 
-// Cargo las asignaturas al iniciar la vista
+// Cargo las asignaturas al montar la vista
 onMounted(async () => {
   await cargarAsignaturas();
 });
@@ -43,38 +56,96 @@ async function cargarAsignaturas() {
   }
 }
 
-// Filtro las asignaturas por código, nombre o descripción
+// Filtro las asignaturas por búsqueda y estado activo/inactivo
 const asignaturasFiltradas = computed(() => {
-  const query = filtroBusqueda.value.toLowerCase().trim();
-  if (!query) return asignaturas.value;
-
   return asignaturas.value.filter((asig) => {
+    const query = filtroBusqueda.value.toLowerCase().trim();
     const texto = `${asig.nombre} ${asig.codigo} ${asig.descripcion || ''}`.toLowerCase();
-    return texto.includes(query);
+    const coincideTexto = !query || texto.includes(query);
+
+    const coincideEstado = 
+      filtroEstado.value === 'todos' ||
+      (filtroEstado.value === 'activas' && asig.activo) ||
+      (filtroEstado.value === 'inactivas' && !asig.activo);
+
+    return coincideTexto && coincideEstado;
   });
 });
 
 // Abro el modal para crear una nueva materia
 function abrirModalCrear() {
-  modalVisible.value = true;
+  modoEdicion.value = false;
+  asignaturaSeleccionada.value = null;
+  modalFormVisible.value = true;
 }
 
-// Proceso la creación de una nueva asignatura
-async function registrarAsignatura(nuevaAsignaturaData) {
+// Abro el modal para editar una materia existente
+function abrirModalEditar(asig) {
+  modoEdicion.value = true;
+  asignaturaSeleccionada.value = { ...asig };
+  modalFormVisible.value = true;
+}
+
+// Abro el modal para consultar el detalle completo de la materia y sus docentes
+function consultarDetalle(asig) {
+  asignaturaDetalle.value = asig;
+  modalDetalleVisible.value = true;
+}
+
+// Proceso el guardado (creación o actualización)
+async function guardarAsignatura(datosFormulario) {
   guardandoAsignatura.value = true;
   try {
-    const creada = await asignaturaService.crear(nuevaAsignaturaData);
-    asignaturas.value.push(creada);
-    mostrarToast(`Asignatura '${creada.nombre}' creada con éxito.`, 'success');
-    modalVisible.value = false;
+    if (modoEdicion.value && asignaturaSeleccionada.value) {
+      const actualizada = await asignaturaService.actualizar(asignaturaSeleccionada.value.id, datosFormulario);
+      const index = asignaturas.value.findIndex((a) => a.id === asignaturaSeleccionada.value.id);
+      if (index !== -1) {
+        asignaturas.value[index] = { ...asignaturas.value[index], ...actualizada };
+      }
+      mostrarToast(`Asignatura '${actualizada.nombre}' actualizada exitosamente.`, 'success');
+    } else {
+      const creada = await asignaturaService.crear(datosFormulario);
+      asignaturas.value.unshift(creada);
+      mostrarToast(`Asignatura '${creada.nombre}' creada con éxito en el plan de estudios.`, 'success');
+    }
+
+    modalFormVisible.value = false;
   } catch (error) {
-    mostrarToast(error.message || 'No se pudo crear la asignatura.', 'error');
+    mostrarToast(error.message || 'No se pudo guardar la información de la materia.', 'error');
   } finally {
     guardandoAsignatura.value = false;
   }
 }
 
-// Muestro una notificación flotante
+// Solicito confirmación para eliminar (sólo disponible para ADMIN)
+function solicitarEliminarAsignatura(asig) {
+  if (!authService.esAdmin.value) {
+    mostrarToast('Acceso denegado: Sólo el rol ADMIN tiene permisos para eliminar materias.', 'error');
+    return;
+  }
+
+  asignaturaAEliminar.value = asig;
+  modalConfirmVisible.value = true;
+}
+
+// Confirmo la eliminación física de la asignatura
+async function confirmarEliminacion() {
+  if (!asignaturaAEliminar.value) return;
+
+  eliminandoAsignatura.value = true;
+  try {
+    await asignaturaService.eliminar(asignaturaAEliminar.value.id);
+    asignaturas.value = asignaturas.value.filter((a) => a.id !== asignaturaAEliminar.value.id);
+    mostrarToast(`Asignatura '${asignaturaAEliminar.value.nombre}' eliminada correctamente.`, 'success');
+    modalConfirmVisible.value = false;
+  } catch (error) {
+    mostrarToast(error.message || 'No fue posible eliminar la asignatura.', 'error');
+  } finally {
+    eliminandoAsignatura.value = false;
+    asignaturaAEliminar.value = null;
+  }
+}
+
 function mostrarToast(mensaje, tipo = 'success') {
   toast.value = {
     visible: true,
@@ -89,17 +160,17 @@ function mostrarToast(mensaje, tipo = 'success') {
 
 <template>
   <div class="asignaturas-view">
-    <!-- Encabezado de la sección de asignaturas -->
+    <!-- Encabezado de la vista -->
     <div class="view-header">
       <div>
-        <h2 class="view-title">Catálogo de Asignaturas (Materias)</h2>
+        <h2 class="view-title">Gestión y Catálogo de Asignaturas (Materias)</h2>
         <p class="view-description">
-          Consulta las materias disponibles en el plan de estudios institucional y registra nuevas asignaturas para asignación docente.
+          Consulta, crea, actualiza y gestiona las materias del plan de estudios institucional.
         </p>
       </div>
 
       <button class="btn btn-primary" @click="abrirModalCrear">
-        <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
+        <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none">
           <line x1="12" y1="5" x2="12" y2="19"/>
           <line x1="5" y1="12" x2="19" y2="12"/>
         </svg>
@@ -107,10 +178,10 @@ function mostrarToast(mensaje, tipo = 'success') {
       </button>
     </div>
 
-    <!-- Barra de búsqueda rápida -->
+    <!-- Filtros de búsqueda y estado -->
     <div class="search-bar card">
       <div class="search-input-wrapper">
-        <svg class="search-icon" viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
+        <svg class="search-icon" viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none">
           <circle cx="11" cy="11" r="8"/>
           <line x1="21" y1="21" x2="16.65" y2="16.65"/>
         </svg>
@@ -118,24 +189,32 @@ function mostrarToast(mensaje, tipo = 'success') {
           v-model="filtroBusqueda" 
           type="text" 
           class="form-input search-input" 
-          placeholder="Filtrar asignaturas por nombre, código académico o contenido temático..."
+          placeholder="Buscar asignatura por nombre, código único o temario..."
         />
+      </div>
+
+      <div class="status-filter-wrapper">
+        <select v-model="filtroEstado" class="form-select filter-select">
+          <option value="todos">Todos los estados</option>
+          <option value="activas">Solo Materias Activas</option>
+          <option value="inactivas">Solo Materias Inactivas</option>
+        </select>
       </div>
     </div>
 
     <!-- Spinner de carga -->
     <div v-if="cargando" class="loading-state card">
       <div class="spinner"></div>
-      <p>Cargando materias del plan de estudios...</p>
+      <p>Cargando catálogo institucional de asignaturas...</p>
     </div>
 
     <!-- Estado vacío -->
     <div v-else-if="asignaturasFiltradas.length === 0" class="empty-state card">
       <h3>No se encontraron asignaturas</h3>
-      <p>No existen materias que coincidan con la búsqueda introducida.</p>
+      <p>No existen materias que coincidan con los criterios de búsqueda.</p>
     </div>
 
-    <!-- Cuadrícula de tarjetas de asignaturas -->
+    <!-- Cuadrícula de tarjetas de asignaturas con acciones completas -->
     <div v-else class="asignaturas-grid">
       <div v-for="asig in asignaturasFiltradas" :key="asig.id" class="asignatura-card card">
         <div class="asig-card-header">
@@ -145,7 +224,9 @@ function mostrarToast(mensaje, tipo = 'success') {
               {{ asig.activo ? 'Activa' : 'Inactiva' }}
             </span>
           </div>
-          <span class="badge badge-secondary" style="border: 1px solid var(--border-color);">{{ asig.creditos }} Créditos</span>
+          <span class="badge badge-secondary" style="border: 1px solid var(--border-color);">
+            {{ asig.creditos }} Créditos
+          </span>
         </div>
 
         <h3 class="asig-title">{{ asig.nombre }}</h3>
@@ -174,27 +255,76 @@ function mostrarToast(mensaje, tipo = 'success') {
           </div>
         </div>
 
-        <!-- Lista de docentes que imparten la materia -->
-        <div class="asig-docentes-section">
-          <div class="section-label">Docentes Impartiendo:</div>
-          <div v-if="asig.docentes && asig.docentes.length > 0" class="docentes-tags">
-            <span v-for="doc in asig.docentes" :key="doc.id" class="docente-tag">
-              👨‍🏫 {{ doc.nombre }} {{ doc.apellidos }}
-            </span>
-          </div>
-          <div v-else class="no-docentes-text">
-            <span>Aún no hay docentes asignados a esta materia.</span>
-          </div>
+        <!-- Barra de Acciones: Consultar, Actualizar y Eliminar -->
+        <div class="asig-actions-bar">
+          <!-- Consultar Detalle -->
+          <button 
+            class="btn btn-secondary btn-sm" 
+            title="Consultar ficha completa y docentes asignados"
+            @click="consultarDetalle(asig)"
+          >
+            <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none">
+              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+              <circle cx="12" cy="12" r="3"/>
+            </svg>
+            <span>Consultar</span>
+          </button>
+
+          <!-- Actualizar (Editar) -->
+          <button 
+            class="btn btn-secondary btn-sm" 
+            title="Actualizar datos curriculares de la asignatura"
+            @click="abrirModalEditar(asig)"
+          >
+            <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none">
+              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+            </svg>
+            <span>Editar</span>
+          </button>
+
+          <!-- Eliminar (Exclusivo ADMIN) -->
+          <button 
+            v-if="authService.esAdmin.value"
+            class="btn btn-outline-danger btn-sm" 
+            title="Eliminar asignatura (Solo rol ADMIN)"
+            @click="solicitarEliminarAsignatura(asig)"
+          >
+            <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none">
+              <polyline points="3 6 5 6 21 6"/>
+              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+            </svg>
+            <span>Eliminar</span>
+          </button>
         </div>
       </div>
     </div>
 
-    <!-- Modal para crear nueva asignatura -->
+    <!-- Modal para Crear / Editar Asignatura -->
     <AsignaturaModal 
-      :visible="modalVisible"
+      :visible="modalFormVisible"
+      :modo-edicion="modoEdicion"
+      :asignatura-inicial="asignaturaSeleccionada"
       :cargando="guardandoAsignatura"
-      @cerrar="modalVisible = false"
-      @guardar="registrarAsignatura"
+      @cerrar="modalFormVisible = false"
+      @guardar="guardarAsignatura"
+    />
+
+    <!-- Modal para Consultar Detalle de Asignatura -->
+    <AsignaturaDetalleModal 
+      :visible="modalDetalleVisible"
+      :asignatura="asignaturaDetalle"
+      @cerrar="modalDetalleVisible = false"
+    />
+
+    <!-- Modal para Confirmar Eliminación -->
+    <ConfirmModal 
+      :visible="modalConfirmVisible"
+      titulo="¿Eliminar Asignatura del Plan de Estudios?"
+      :mensaje="asignaturaAEliminar ? `¿Confirmas que deseas eliminar la asignatura '${asignaturaAEliminar.nombre}' (${asignaturaAEliminar.codigo})? Recuerda que no se podrá eliminar si tiene docentes impartiéndola.` : ''"
+      :cargando="eliminandoAsignatura"
+      @cancelar="modalConfirmVisible = false"
+      @confirmar="confirmarEliminacion"
     />
 
     <!-- Notificación Toast -->
@@ -230,13 +360,22 @@ function mostrarToast(mensaje, tipo = 'success') {
 }
 
 .search-bar {
+  display: flex;
+  gap: 1rem;
   padding: 1rem 1.25rem;
   margin-bottom: 1.5rem;
+  flex-wrap: wrap;
 }
 
 .search-input-wrapper {
   position: relative;
-  width: 100%;
+  flex: 2;
+  min-width: 280px;
+}
+
+.status-filter-wrapper {
+  flex: 1;
+  min-width: 200px;
 }
 
 .search-icon {
@@ -251,10 +390,9 @@ function mostrarToast(mensaje, tipo = 'success') {
   padding-left: 2.5rem;
 }
 
-/* Grid de materias */
 .asignaturas-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(330px, 1fr));
   gap: 1.25rem;
 }
 
@@ -316,39 +454,17 @@ function mostrarToast(mensaje, tipo = 'success') {
   font-weight: 600;
 }
 
-.asig-docentes-section {
-  border-top: 1px dashed var(--border-color);
-  padding-top: 0.875rem;
-}
-
-.section-label {
-  font-size: 0.75rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  color: var(--text-muted);
-  margin-bottom: 0.5rem;
-}
-
-.docentes-tags {
+.asig-actions-bar {
   display: flex;
-  flex-wrap: wrap;
-  gap: 0.4rem;
+  gap: 0.5rem;
+  padding-top: 0.875rem;
+  border-top: 1px solid var(--border-color);
+  justify-content: flex-end;
 }
 
-.docente-tag {
-  background-color: #f1f5f9;
-  border: 1px solid var(--border-color);
-  color: var(--text-primary);
-  font-size: 0.75rem;
-  font-weight: 600;
-  padding: 0.25rem 0.5rem;
-  border-radius: var(--radius-sm);
-}
-
-.no-docentes-text {
+.btn-sm {
+  padding: 0.4rem 0.75rem;
   font-size: 0.775rem;
-  color: var(--text-muted);
-  font-style: italic;
 }
 
 .loading-state, .empty-state {

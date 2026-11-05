@@ -3,6 +3,7 @@ const { Router } = require('express');
 
 // Importo mis enrutadores modulares
 const authRoutes = require('./authRoutes');
+const usuarioRoutes = require('./usuarioRoutes');
 const asignaturaRoutes = require('./asignaturaRoutes');
 const docenteRoutes = require('./docenteRoutes');
 const reporteRoutes = require('./reporteRoutes');
@@ -10,7 +11,7 @@ const reporteRoutes = require('./reporteRoutes');
 // Inicializo el enrutador principal de mi API
 const router = Router();
 
-// Defino un endpoint de verificación de estado (Health Check)
+// Endpoint de verificación de estado (Health Check)
 router.get('/health', (req, res) => {
   res.status(200).json({
     success: true,
@@ -19,17 +20,20 @@ router.get('/health', (req, res) => {
   });
 });
 
-// Asigno el prefijo /auth a las rutas de autenticación y control de acceso
+// Rutas de autenticación
 router.use('/auth', authRoutes);
 
-// Asigno el prefijo /asignaturas a las rutas de gestión de asignaturas
+// Rutas de administración de usuarios (Exclusivo ADMIN)
+router.use('/usuarios', usuarioRoutes);
+
+// Rutas de gestión de asignaturas (CRUD completo)
 router.use('/asignaturas', asignaturaRoutes);
 
-// Asigno el prefijo /docentes a las rutas de gestión de docentes
+// Rutas de gestión de docentes (CRUD completo con asignatura activa)
 router.use('/docentes', docenteRoutes);
 
-// Asigno el prefijo /reportes a las rutas de exportación y resúmenes analíticos
+// Rutas de reportes y exportación (Excel / CSV y estadísticas)
 router.use('/reportes', reporteRoutes);
 
-// Exporto mi enrutador central de la API
+// Exporto mi enrutador central
 module.exports = router;

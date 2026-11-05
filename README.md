@@ -26,23 +26,30 @@ Plataforma Fullstack integral con temática administrativa académica para la ge
 
 He desarrollado esta solución pensando en los estándares de un panel administrativo institucional universitario, permitiendo a los coordinadores y administradores:
 - Visualizar el cuadro docente con sus asignaturas asignadas.
-- Contratar/Registrar nuevos docentes asociándoles su materia de especialidad.
-- Consultar las asignaturas disponibles en el plan de estudios y dar de alta nuevas asignaturas.
+- Contratar y registrar nuevos docentes asociándoles obligatoriamente su materia activa.
+- **Gestión completa de Asignaturas:** Consultar el detalle con docentes asignados, crear materias, actualizar sus créditos/horas y eliminarlas de forma segura.
 - Reasignar o cambiar la materia de enseñanza de cualquier docente de forma interactiva.
-- Editar la información académica o eliminar docentes de la base de datos con confirmación de seguridad.
+- Editar la información académica o eliminar docentes de la base de datos (con control por roles).
+- Control de gobernanza mediante el módulo exclusivo de Cuentas y Usuarios para Administradores.
 - Exportar la nómina docente a formatos estándar de oficina (Excel/CSV y PDF).
 
 ---
 
 ## 🔐 Seguridad y Control de Acceso (Autenticación & Roles)
 
-He implementado un sistema robusto de autenticación y autorización basado en **JSON Web Tokens (JWT)** y contraseñas cifradas mediante **bcryptjs**:
+He implementado un sistema robusto de autenticación y autorización basado en **JSON Web Tokens (JWT)** y contraseñas cifradas mediante **bcryptjs**, con una diferenciación real de niveles y pantallas en el frontend:
 
 - **Autenticación JWT:** Cada petición que modifica el estado institucional (`POST`, `PUT`, `DELETE`) requiere una cabecera `Authorization: Bearer <token>`.
-- **Control de Acceso Basado en Roles (RBAC):**
-  - **`ADMIN`:** Control total del sistema. Es el único rol facultado para **eliminar docentes y materias** de la base de datos.
-  - **`COORDINADOR`:** Facultado para dar de alta docentes, reasignar materias de enseñanza y crear asignaturas en el plan de estudios, pero con restricciones para eliminar registros.
-- **Guardianes de Ruta en Vue Router (`beforeEach`):** Protege las vistas del frontend redirigiendo automáticamente a la pantalla de login si el usuario no cuenta con una sesión válida.
+- **Diferenciación de Niveles en la Interfaz y API:**
+  - **`ADMIN` (Nivel Directivo y Gobernanza):**
+    - Posee acceso exclusivo a la pestaña **`Cuentas & Usuarios` (`/usuarios`)** para auditar y consultar todo el personal del sistema.
+    - Es el **único rol facultado para eliminar** docentes y materias (los botones rojos de eliminación sólo son visibles para él).
+    - Puede cambiar el estado curricular de las asignaturas a *Activa* o *Inactiva*.
+  - **`COORDINADOR` (Nivel Académico y Operativo):**
+    - Su interfaz está optimizada para la planificación docente sin riesgos de borrado accidental (los botones de eliminación no se le muestran).
+    - Puede dar de alta docentes, reasignar materias activas, crear asignaturas curriculares y exportar reportes en Excel e imprimir fichas oficiales.
+    - No tiene acceso al módulo de usuarios (`/usuarios`), el enrutador lo redirige automáticamente a `/docentes`.
+- **Guardianes de Ruta en Vue Router (`beforeEach`):** Protege las vistas del frontend verificando autenticación y roles específicos (`requiresAdmin`).
 
 ---
 

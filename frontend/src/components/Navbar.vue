@@ -6,7 +6,6 @@ import { authService } from '../services/authService';
 const route = useRoute();
 const router = useRouter();
 
-// Cierro la sesión y redirijo a la pantalla de login
 function cerrarSesion() {
   authService.logout();
   router.push('/login');
@@ -14,24 +13,33 @@ function cerrarSesion() {
 </script>
 
 <template>
-  <!-- Barra de navegación superior con soporte de identidad de usuario y roles -->
+  <!-- Barra de navegación superior con diferenciación visible entre Admin y Coordinador -->
   <header class="admin-navbar">
     <div class="navbar-container">
       <div class="navbar-brand">
-        <div class="brand-icon">
-          <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
+        <div class="brand-icon" :class="authService.esAdmin.value ? 'brand-admin' : 'brand-coord'">
+          <!-- Ícono distintivo según rol -->
+          <svg v-if="authService.esAdmin.value" viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="none">
+            <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+          </svg>
+          <svg v-else viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="none">
             <path d="M22 10v6M2 10l10-5 10 5-10 5z"/>
             <path d="M6 12v5c3 3 9 3 12 0v-5"/>
           </svg>
         </div>
         <div>
-          <h1 class="brand-title">Portal Docente</h1>
-          <p class="brand-subtitle">Gestión Académica Institucional</p>
+          <h1 class="brand-title">Portal Institucional</h1>
+          <p class="brand-subtitle">
+            <span v-if="authService.esAdmin.value" class="role-desc admin-color">● Modo Dirección & Gobernanza (ADMIN)</span>
+            <span v-else-if="authService.estaAutenticado.value" class="role-desc coord-color">● Modo Coordinación Académica (COORDINADOR)</span>
+            <span v-else>Gestión Académica Universitaria</span>
+          </p>
         </div>
       </div>
 
-      <!-- Menú de navegación visible sólo si el usuario está autenticado -->
+      <!-- Menú de navegación condicional por rol -->
       <nav v-if="authService.estaAutenticado.value" class="navbar-nav">
+        <!-- Pestaña: Docentes (Disponible para ambos) -->
         <RouterLink 
           to="/docentes" 
           class="nav-item" 
@@ -44,6 +52,7 @@ function cerrarSesion() {
           <span>Docentes</span>
         </RouterLink>
 
+        <!-- Pestaña: Asignaturas (Disponible para ambos) -->
         <RouterLink 
           to="/asignaturas" 
           class="nav-item" 
@@ -53,11 +62,27 @@ function cerrarSesion() {
             <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
             <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
           </svg>
-          <span>Asignaturas (Materias)</span>
+          <span>Asignaturas</span>
+        </RouterLink>
+
+        <!-- Pestaña EXCLUSIVA para ADMIN: Usuarios del Sistema -->
+        <RouterLink 
+          v-if="authService.esAdmin.value"
+          to="/usuarios" 
+          class="nav-item nav-admin-item" 
+          :class="{ 'active': route.path === '/usuarios' }"
+        >
+          <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none">
+            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+            <circle cx="9" cy="7" r="4"/>
+            <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+            <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+          </svg>
+          <span>Cuentas & Usuarios</span>
         </RouterLink>
       </nav>
 
-      <!-- Bloque de usuario autenticado con rol y botón de desconexión -->
+      <!-- Bloque de usuario activo -->
       <div v-if="authService.estaAutenticado.value" class="user-block">
         <div class="user-info">
           <span class="user-name">{{ authService.usuario.value?.nombre }}</span>
@@ -79,7 +104,6 @@ function cerrarSesion() {
         </button>
       </div>
 
-      <!-- Estado cuando está en la pantalla de Login -->
       <div v-else class="navbar-status">
         <span class="status-indicator-dot"></span>
         <span class="status-indicator-text">API Conectada</span>
@@ -115,7 +139,6 @@ function cerrarSesion() {
 }
 
 .brand-icon {
-  background: linear-gradient(135deg, var(--primary), #1d4ed8);
   color: #ffffff;
   width: 42px;
   height: 42px;
@@ -123,7 +146,16 @@ function cerrarSesion() {
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.25);
+}
+
+.brand-admin {
+  background: linear-gradient(135deg, var(--primary), #1e40af);
+  box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.3);
+}
+
+.brand-coord {
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  box-shadow: 0 4px 6px -1px rgba(245, 158, 11, 0.3);
 }
 
 .brand-title {
@@ -135,8 +167,15 @@ function cerrarSesion() {
 
 .brand-subtitle {
   font-size: 0.75rem;
-  color: var(--text-muted);
-  font-weight: 500;
+  font-weight: 600;
+}
+
+.admin-color {
+  color: var(--primary);
+}
+
+.coord-color {
+  color: #b45309;
 }
 
 .navbar-nav {
@@ -169,6 +208,10 @@ function cerrarSesion() {
   background-color: #ffffff;
   color: var(--primary);
   box-shadow: var(--shadow-sm);
+}
+
+.nav-admin-item {
+  color: #1e40af;
 }
 
 .user-block {
@@ -219,9 +262,6 @@ function cerrarSesion() {
   .navbar-container {
     flex-direction: column;
     align-items: stretch;
-  }
-  .user-block {
-    justify-content: space-between;
   }
 }
 </style>

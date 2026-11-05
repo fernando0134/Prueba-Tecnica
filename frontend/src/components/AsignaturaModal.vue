@@ -1,12 +1,20 @@
 <script setup>
 // Importo utilidades reactivas desde Vue
-import { ref, watch } from 'vue';
+import { ref, watch, computed } from 'vue';
 
-// Defino las propiedades del modal de asignatura
+// Defino las propiedades del modal de asignatura (soporta creación y edición)
 const props = defineProps({
   visible: {
     type: Boolean,
     default: false,
+  },
+  modoEdicion: {
+    type: Boolean,
+    default: false,
+  },
+  asignaturaInicial: {
+    type: Object,
+    default: () => ({}),
   },
   cargando: {
     type: Boolean,
@@ -24,26 +32,42 @@ const formulario = ref({
   descripcion: '',
   creditos: 4,
   horasSemanales: 4,
+  activo: true,
 });
 
 // Almaceno los errores de validación
 const errores = ref({});
 
-// Observo la apertura del modal para reiniciar el formulario
+// Observo cambios en la visibilidad o asignatura inicial para poblar los datos
 watch(
   () => props.visible,
   (estaVisible) => {
     if (estaVisible) {
       errores.value = {};
-      formulario.value = {
-        nombre: '',
-        codigo: '',
-        descripcion: '',
-        creditos: 4,
-        horasSemanales: 4,
-      };
+      if (props.modoEdicion && props.asignaturaInicial) {
+        // Cargo los datos de la asignatura existente para su edición
+        formulario.value = {
+          nombre: props.asignaturaInicial.nombre || '',
+          codigo: props.asignaturaInicial.codigo || '',
+          descripcion: props.asignaturaInicial.descripcion || '',
+          creditos: props.asignaturaInicial.creditos ?? 4,
+          horasSemanales: props.asignaturaInicial.horasSemanales ?? 4,
+          activo: props.asignaturaInicial.activo !== undefined ? props.asignaturaInicial.activo : true,
+        };
+      } else {
+        // Reinicio los campos para crear una nueva materia
+        formulario.value = {
+          nombre: '',
+          codigo: '',
+          descripcion: '',
+          creditos: 4,
+          horasSemanales: 4,
+          activo: true,
+        };
+      }
     }
-  }
+  },
+  { immediate: true }
 );
 
 // Valido los campos obligatorios antes de enviar
@@ -70,7 +94,7 @@ function validarFormulario() {
   return Object.keys(errs).length === 0;
 }
 
-// Proceso el registro de la nueva asignatura
+// Proceso el registro o actualización de la asignatura
 function manejarEnvio() {
   if (!validarFormulario()) return;
 
@@ -79,24 +103,30 @@ function manejarEnvio() {
     codigo: formulario.value.codigo.trim().toUpperCase(),
     creditos: Number(formulario.value.creditos),
     horasSemanales: Number(formulario.value.horasSemanales),
+    activo: Boolean(formulario.value.activo),
   });
 }
+
+const tituloModal = computed(() => {
+  return props.modoEdicion ? 'Actualizar Asignatura (Materia)' : 'Crear Nueva Asignatura (Materia)';
+});
 </script>
 
 <template>
-  <!-- Modal para crear una nueva asignatura (materia) -->
   <div v-if="props.visible" class="modal-overlay" @click.self="emit('cerrar')">
     <div class="modal-content">
       <div class="modal-header">
         <div>
-          <h2 class="modal-title">Crear Nueva Asignatura (Materia)</h2>
-          <p class="modal-subtitle">Agrega una nueva materia al plan de estudios para que los docentes puedan ser asignados.</p>
+          <h2 class="modal-title">{{ tituloModal }}</h2>
+          <p class="modal-subtitle">
+            {{ props.modoEdicion ? 'Modifica los datos curriculares o el estado de la materia.' : 'Agrega una nueva materia al plan de estudios para asignación docente.' }}
+          </p>
         </div>
         <button class="modal-close-btn" @click="emit('cerrar')" aria-label="Cerrar modal">&times;</button>
       </div>
 
       <form @submit.prevent="manejarEnvio" novalidate>
-        <!-- Campo: Nombre de la Asignatura -->
+        <!-- Campo: Nombre de la Asignatura (Único) -->
         <div class="form-group">
           <label class="form-label" for="asig-nombre">Nombre de la Asignatura (Único) *</label>
           <input 
@@ -141,19 +171,30 @@ function manejarEnvio() {
           </div>
         </div>
 
-        <!-- Campo: Horas Semanales -->
-        <div class="form-group">
-          <label class="form-label" for="asig-horas">Horas Semanales de Clase *</label>
-          <input 
-            id="asig-horas" 
-            v-model="formulario.horasSemanales" 
-            type="number" 
-            min="1" 
-            max="40" 
-            class="form-input" 
-            :class="{ 'is-invalid': errores.horasSemanales }"
-          />
-          <span v-if="errores.horasSemanales" class="form-error">{{ errores.horasSemanales }}</span>
+        <div class="form-grid">
+          <!-- Campo: Horas Semanales -->
+          <div class="form-group">
+            <label class="form-label" for="asig-horas">Horas Semanales de Clase *</label>
+            <input 
+              id="asig-horas" 
+              v-model="formulario.horasSemanales" 
+              type="number" 
+              min="1" 
+              max="40" 
+              class="form-input" 
+              :class="{ 'is-invalid': errores.horasSemanales }"
+            />
+            <span v-if="errores.horasSemanales" class="form-error">{{ errores.horasSemanales }}</span>
+          </div>
+
+          <!-- Campo: Estado Activo / Inactivo -->
+          <div class="form-group">
+            <label class="form-label" for="asig-activo">Estado Curricular</label>
+            <select id="asig-activo" v-model="formulario.activo" class="form-select">
+              <option :value="true">Activa (Disponible para asignación)</option>
+              <option :value="false">Inactiva (En revisión / Dada de baja)</option>
+            </select>
+          </div>
         </div>
 
         <!-- Campo: Descripción -->
@@ -182,8 +223,8 @@ function manejarEnvio() {
             class="btn btn-primary" 
             :disabled="props.cargando"
           >
-            <span v-if="props.cargando">Creando materia...</span>
-            <span v-else>Crear Asignatura</span>
+            <span v-if="props.cargando">Guardando cambios...</span>
+            <span v-else>{{ props.modoEdicion ? 'Actualizar Asignatura' : 'Crear Asignatura' }}</span>
           </button>
         </div>
       </form>

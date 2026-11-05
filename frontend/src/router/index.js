@@ -5,9 +5,10 @@ import { authService } from '../services/authService';
 // Importo mis vistas principales
 import DocentesView from '../views/DocentesView.vue';
 import AsignaturasView from '../views/AsignaturasView.vue';
+import UsuariosView from '../views/UsuariosView.vue';
 import LoginView from '../views/LoginView.vue';
 
-// Defino la lista de rutas con sus respectivos requerimientos de autenticación
+// Defino la lista de rutas con sus respectivos requerimientos de autenticación y roles
 const routes = [
   {
     path: '/',
@@ -29,7 +30,13 @@ const routes = [
     path: '/asignaturas',
     name: 'Asignaturas',
     component: AsignaturasView,
-    meta: { title: 'Catálogo de Asignaturas', requiresAuth: true },
+    meta: { title: 'Gestión de Asignaturas', requiresAuth: true },
+  },
+  {
+    path: '/usuarios',
+    name: 'Usuarios',
+    component: UsuariosView,
+    meta: { title: 'Gobernanza y Usuarios', requiresAuth: true, requiresAdmin: true },
   },
   {
     path: '/:pathMatch(.*)*',
@@ -43,18 +50,24 @@ const router = createRouter({
   routes,
 });
 
-// Implemento el guardián de navegación para proteger rutas administrativas
+// Implemento el guardián de navegación para proteger rutas y verificar roles
 router.beforeEach((to, from, next) => {
   document.title = `${to.meta.title || 'Portal'} | Panel Administrativo`;
 
   const estaAutenticado = authService.estaAutenticado.value;
+  const esAdmin = authService.esAdmin.value;
 
-  // Si la ruta requiere autenticación y el usuario no ha iniciado sesión, redirijo al login
+  // Redirijo al login si la ruta requiere sesión activa
   if (to.meta.requiresAuth && !estaAutenticado) {
     return next({ path: '/login' });
   }
 
-  // Si el usuario ya está autenticado e intenta ir a /login, lo llevo a /docentes
+  // Si requiere rol ADMIN y el usuario es COORDINADOR, lo redirijo a /docentes
+  if (to.meta.requiresAdmin && !esAdmin) {
+    return next({ path: '/docentes' });
+  }
+
+  // Si ya tiene sesión activa e intenta ir al login, lo dirijo al dashboard
   if (to.meta.requiresGuest && estaAutenticado) {
     return next({ path: '/docentes' });
   }
