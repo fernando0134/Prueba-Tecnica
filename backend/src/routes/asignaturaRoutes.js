@@ -1,30 +1,46 @@
 // Importo Router desde Express
 const { Router } = require('express');
 
-// Importo mi controlador de asignaturas y mis validadores
+// Importo mi controlador de asignaturas, validadores y middlewares de seguridad
 const asignaturaController = require('../controllers/asignaturaController');
 const {
   validarCrearAsignatura,
   validarActualizarAsignatura,
 } = require('../middlewares/validators');
+const { verificarToken, verificarRol } = require('../middlewares/auth');
 
 // Inicializo el enrutador para las rutas de asignaturas
 const router = Router();
 
-// Defino la ruta para consultar todas las asignaturas
+// Consultas públicas / de lectura
 router.get('/', asignaturaController.obtenerTodas);
-
-// Defino la ruta para consultar una asignatura por su identificador
 router.get('/:id', asignaturaController.obtenerPorId);
 
-// Defino la ruta para crear una nueva asignatura pasando por mi validador
-router.post('/', validarCrearAsignatura, asignaturaController.crear);
+// Creación: Requiere autenticación y rol ADMIN o COORDINADOR
+router.post(
+  '/',
+  verificarToken,
+  verificarRol(['ADMIN', 'COORDINADOR']),
+  validarCrearAsignatura,
+  asignaturaController.crear
+);
 
-// Defino la ruta para actualizar una asignatura por su identificador
-router.put('/:id', validarActualizarAsignatura, asignaturaController.actualizar);
+// Modificación: Requiere autenticación y rol ADMIN o COORDINADOR
+router.put(
+  '/:id',
+  verificarToken,
+  verificarRol(['ADMIN', 'COORDINADOR']),
+  validarActualizarAsignatura,
+  asignaturaController.actualizar
+);
 
-// Defino la ruta para eliminar una asignatura por su identificador
-router.delete('/:id', asignaturaController.eliminar);
+// Eliminación: Estrictamente reservada para rol ADMIN (protección contra eliminaciones indebidas)
+router.delete(
+  '/:id',
+  verificarToken,
+  verificarRol(['ADMIN']),
+  asignaturaController.eliminar
+);
 
 // Exporto mi enrutador de asignaturas
 module.exports = router;

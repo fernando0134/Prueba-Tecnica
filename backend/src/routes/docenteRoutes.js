@@ -1,30 +1,46 @@
 // Importo Router desde Express
 const { Router } = require('express');
 
-// Importo mi controlador de docentes y mis validadores
+// Importo mi controlador de docentes, validadores y middlewares de seguridad
 const docenteController = require('../controllers/docenteController');
 const {
   validarCrearDocente,
   validarActualizarDocente,
 } = require('../middlewares/validators');
+const { verificarToken, verificarRol } = require('../middlewares/auth');
 
 // Inicializo el enrutador para las rutas de docentes
 const router = Router();
 
-// Defino la ruta para consultar todos los docentes con sus asignaturas
+// Consultas de lectura
 router.get('/', docenteController.obtenerTodos);
-
-// Defino la ruta para consultar el detalle de un docente por su ID
 router.get('/:id', docenteController.obtenerPorId);
 
-// Defino la ruta para crear un docente con su asignatura asignada
-router.post('/', validarCrearDocente, docenteController.crear);
+// Creación de docente: Requiere autenticación y rol ADMIN o COORDINADOR
+router.post(
+  '/',
+  verificarToken,
+  verificarRol(['ADMIN', 'COORDINADOR']),
+  validarCrearDocente,
+  docenteController.crear
+);
 
-// Defino la ruta para actualizar los datos de un docente y/o su asignatura asignada
-router.put('/:id', validarActualizarDocente, docenteController.actualizar);
+// Modificación y reasignación de materia: Requiere autenticación y rol ADMIN o COORDINADOR
+router.put(
+  '/:id',
+  verificarToken,
+  verificarRol(['ADMIN', 'COORDINADOR']),
+  validarActualizarDocente,
+  docenteController.actualizar
+);
 
-// Defino la ruta para eliminar un docente de la base de datos
-router.delete('/:id', docenteController.eliminar);
+// Eliminación de docente: Estrictamente reservada para rol ADMIN
+router.delete(
+  '/:id',
+  verificarToken,
+  verificarRol(['ADMIN']),
+  docenteController.eliminar
+);
 
 // Exporto mi enrutador de docentes
 module.exports = router;

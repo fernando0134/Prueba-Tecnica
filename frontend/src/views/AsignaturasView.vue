@@ -139,8 +139,13 @@ function mostrarToast(mensaje, tipo = 'success') {
     <div v-else class="asignaturas-grid">
       <div v-for="asig in asignaturasFiltradas" :key="asig.id" class="asignatura-card card">
         <div class="asig-card-header">
-          <span class="badge badge-primary code-badge">{{ asig.codigo }}</span>
-          <span class="badge badge-success">{{ asig.creditos }} Créditos</span>
+          <div style="display: flex; gap: 0.5rem; align-items: center;">
+            <span class="badge badge-primary code-badge">{{ asig.codigo }}</span>
+            <span class="badge" :class="asig.activo ? 'badge-success' : 'badge-warning'">
+              {{ asig.activo ? 'Activa' : 'Inactiva' }}
+            </span>
+          </div>
+          <span class="badge badge-secondary" style="border: 1px solid var(--border-color);">{{ asig.creditos }} Créditos</span>
         </div>
 
         <h3 class="asig-title">{{ asig.nombre }}</h3>

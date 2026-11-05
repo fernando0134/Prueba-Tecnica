@@ -2,24 +2,25 @@
 // Importo utilidades reactivas y ciclo de vida desde Vue
 import { ref, computed, onMounted } from 'vue';
 
-// Importo los servicios para interactuar con la API del backend
+// Importo los servicios para interactuar con la API del backend y el servicio de autenticación
 import { docenteService } from '../services/docenteService';
 import { asignaturaService } from '../services/asignaturaService';
+import { authService } from '../services/authService';
 
-// Importo mis componentes modulares
+// Importo componentes modulares
 import StatsOverview from '../components/StatsOverview.vue';
 import DocenteModal from '../components/DocenteModal.vue';
 import ConfirmModal from '../components/ConfirmModal.vue';
 import ToastNotification from '../components/ToastNotification.vue';
 
-// Defino el estado reactivo principal de la vista
+// Estado reactivo principal
 const docentes = ref([]);
 const asignaturas = ref([]);
 const cargando = ref(true);
 const filtroBusqueda = ref('');
 const filtroAsignatura = ref('');
 
-// Estado para modales
+// Modales
 const modalDocenteVisible = ref(false);
 const modoEdicion = ref(false);
 const docenteSeleccionado = ref(null);
@@ -29,23 +30,22 @@ const modalConfirmVisible = ref(false);
 const docenteAEliminar = ref(null);
 const eliminandoDocente = ref(false);
 
-// Estado para notificaciones Toast
+// Notificaciones Toast
 const toast = ref({
   visible: false,
   mensaje: '',
   tipo: 'success',
 });
 
-// Cargo los datos al montar el componente en el DOM
+// Cargo los datos al montar la vista
 onMounted(async () => {
   await cargarDatosIniciales();
 });
 
-// Función con la que obtengo los docentes y las asignaturas desde la API
+// Consulto docentes y asignaturas activas en paralelo
 async function cargarDatosIniciales() {
   cargando.value = true;
   try {
-    // Consulto docentes y asignaturas en paralelo
     const [listaDocentes, listaAsignaturas] = await Promise.all([
       docenteService.obtenerTodos(),
       asignaturaService.obtenerTodas(),
@@ -60,7 +60,7 @@ async function cargarDatosIniciales() {
   }
 }
 
-// Calculo el listado filtrado de docentes según los criterios de búsqueda
+// Filtro docentes en tiempo real por texto o por materia asignada
 const docentesFiltrados = computed(() => {
   return docentes.value.filter((doc) => {
     const texto = `${doc.nombre} ${doc.apellidos} ${doc.email} ${doc.tituloAcademico}`.toLowerCase();
@@ -74,46 +74,40 @@ const docentesFiltrados = computed(() => {
   });
 });
 
-// Calculo el promedio de años de experiencia para las métricas del panel
+// Promedio de experiencia para las métricas
 const promedioExperiencia = computed(() => {
   if (docentes.value.length === 0) return 0;
   const suma = docentes.value.reduce((acc, doc) => acc + (doc.experienciaAnos || 0), 0);
   return Math.round((suma / docentes.value.length) * 10) / 10;
 });
 
-// Abro el modal para registrar un nuevo docente
 function abrirModalCrear() {
   modoEdicion.value = false;
   docenteSeleccionado.value = null;
   modalDocenteVisible.value = true;
 }
 
-// Abro el modal en modo edición permitiendo actualizar datos o reasignar su asignatura
 function abrirModalEditar(docente) {
   modoEdicion.value = true;
   docenteSeleccionado.value = { ...docente };
   modalDocenteVisible.value = true;
 }
 
-// Proceso el guardado (creación o actualización) del docente
+// Proceso el guardado con validación y manejo de errores de backend
 async function guardarDocente(datosFormulario) {
   guardandoDocente.value = true;
   try {
     if (modoEdicion.value && docenteSeleccionado.value) {
-      // Actualizo el docente existente (incluyendo posibilidad de cambiar la asignatura asignada)
       const docenteActualizado = await docenteService.actualizar(docenteSeleccionado.value.id, datosFormulario);
-      
-      // Actualizo el elemento en la lista local
       const index = docentes.value.findIndex((d) => d.id === docenteSeleccionado.value.id);
       if (index !== -1) {
         docentes.value[index] = docenteActualizado;
       }
-      mostrarToast('Docente e información de asignatura actualizados correctamente.', 'success');
+      mostrarToast('Docente y su asignatura activa actualizados con éxito.', 'success');
     } else {
-      // Registro un nuevo docente en la base de datos
       const nuevoDocente = await docenteService.crear(datosFormulario);
       docentes.value.unshift(nuevoDocente);
-      mostrarToast('Nuevo docente registrado con su asignatura asignada con éxito.', 'success');
+      mostrarToast('Docente registrado y asignado a su materia activa con éxito.', 'success');
     }
 
     modalDocenteVisible.value = false;
@@ -124,23 +118,25 @@ async function guardarDocente(datosFormulario) {
   }
 }
 
-// Abro el modal de confirmación antes de eliminar al docente
 function solicitarEliminarDocente(docente) {
+  // Compruebo si el usuario actual tiene permisos de Administrador
+  if (!authService.esAdmin.value) {
+    mostrarToast('Acceso denegado: Sólo los usuarios con rol ADMIN pueden eliminar docentes.', 'error');
+    return;
+  }
+
   docenteAEliminar.value = docente;
   modalConfirmVisible.value = true;
 }
 
-// Confirmo y ejecuto la eliminación física del docente de la base de datos
 async function confirmarEliminacion() {
   if (!docenteAEliminar.value) return;
 
   eliminandoDocente.value = true;
   try {
     await docenteService.eliminar(docenteAEliminar.value.id);
-    
-    // Remuevo al docente de mi estado reactivo
     docentes.value = docentes.value.filter((d) => d.id !== docenteAEliminar.value.id);
-    mostrarToast(`Docente ${docenteAEliminar.value.nombre} eliminado exitosamente de la base de datos.`, 'success');
+    mostrarToast(`Docente ${docenteAEliminar.value.nombre} eliminado exitosamente.`, 'success');
     modalConfirmVisible.value = false;
   } catch (error) {
     mostrarToast(error.message || 'No fue posible eliminar al docente.', 'error');
@@ -150,7 +146,17 @@ async function confirmarEliminacion() {
   }
 }
 
-// Muestro un mensaje Toast flotante
+// Descargo el archivo CSV compatible con Excel desde el endpoint de reportes
+function descargarReporteCsv() {
+  window.open('/api/reportes/docentes/csv', '_blank');
+  mostrarToast('Descargando reporte de docentes y asignaciones en formato Excel / CSV...', 'success');
+}
+
+// Activo la vista de impresión del navegador para emitir la ficha institucional
+function imprimirReporte() {
+  window.print();
+}
+
 function mostrarToast(mensaje, tipo = 'success') {
   toast.value = {
     visible: true,
@@ -165,7 +171,7 @@ function mostrarToast(mensaje, tipo = 'success') {
 
 <template>
   <div class="docentes-view">
-    <!-- Panel de estadísticas generales del área académica -->
+    <!-- Panel de métricas académicas -->
     <StatsOverview 
       :total-docentes="docentes.length"
       :total-asignaturas="asignaturas.length"
@@ -173,28 +179,51 @@ function mostrarToast(mensaje, tipo = 'success') {
       :asignaturas-activas="asignaturas.filter(a => a.activo).length"
     />
 
-    <!-- Barra de acciones y control administrativo -->
+    <!-- Barra de acciones y exportación de reportes -->
     <div class="view-header">
       <div>
         <h2 class="view-title">Gestión de Docentes</h2>
         <p class="view-description">
-          Visualiza los docentes registrados, su materia de enseñanza asignada, o registra nuevas contrataciones.
+          Administración de la plantilla académica institucional y asignación de materias activas de enseñanza.
         </p>
       </div>
 
-      <button class="btn btn-primary" @click="abrirModalCrear">
-        <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
-          <line x1="12" y1="5" x2="12" y2="19"/>
-          <line x1="5" y1="12" x2="19" y2="12"/>
-        </svg>
-        <span>Registrar Nuevo Docente</span>
-      </button>
+      <div class="header-actions">
+        <!-- Botón: Exportar a Excel / CSV -->
+        <button class="btn btn-secondary" @click="descargarReporteCsv" title="Descargar nómina docente en Excel / CSV">
+          <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+            <polyline points="7 10 12 15 17 10"/>
+            <line x1="12" y1="15" x2="12" y2="3"/>
+          </svg>
+          <span>Exportar Excel</span>
+        </button>
+
+        <!-- Botón: Imprimir Reporte -->
+        <button class="btn btn-secondary" @click="imprimirReporte" title="Imprimir informe oficial">
+          <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none">
+            <polyline points="6 9 6 2 18 2 18 9"/>
+            <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/>
+            <rect x="6" y="14" width="12" height="8"/>
+          </svg>
+          <span>Imprimir Ficha</span>
+        </button>
+
+        <!-- Botón: Registrar Nuevo Docente -->
+        <button class="btn btn-primary" @click="abrirModalCrear">
+          <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none">
+            <line x1="12" y1="5" x2="12" y2="19"/>
+            <line x1="5" y1="12" x2="19" y2="12"/>
+          </svg>
+          <span>Registrar Docente</span>
+        </button>
+      </div>
     </div>
 
-    <!-- Barra de filtrado y búsqueda reactiva -->
-    <div class="filters-card card">
+    <!-- Barra de filtros -->
+    <div class="filters-card card no-print">
       <div class="search-input-wrapper">
-        <svg class="search-icon" viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
+        <svg class="search-icon" viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none">
           <circle cx="11" cy="11" r="8"/>
           <line x1="21" y1="21" x2="16.65" y2="16.65"/>
         </svg>
@@ -202,7 +231,7 @@ function mostrarToast(mensaje, tipo = 'success') {
           v-model="filtroBusqueda" 
           type="text" 
           class="form-input search-input" 
-          placeholder="Buscar docente por nombre, apellidos, correo o título..."
+          placeholder="Buscar por nombre, apellidos, correo único o título académico..."
         />
       </div>
 
@@ -210,36 +239,25 @@ function mostrarToast(mensaje, tipo = 'success') {
         <select v-model="filtroAsignatura" class="form-select filter-select">
           <option value="">Todas las asignaturas de enseñanza</option>
           <option v-for="asig in asignaturas" :key="asig.id" :value="asig.id">
-            {{ asig.nombre }} ({{ asig.codigo }})
+            {{ asig.nombre }} ({{ asig.codigo }}) {{ !asig.activo ? '[Inactiva]' : '' }}
           </option>
         </select>
       </div>
     </div>
 
-    <!-- Estado de carga: Spinner -->
+    <!-- Loading -->
     <div v-if="cargando" class="loading-state card">
       <div class="spinner"></div>
-      <p>Cargando lista de docentes y asignaturas asignadas...</p>
+      <p>Cargando información de docentes y asignaturas activas...</p>
     </div>
 
-    <!-- Estado vacío: Sin resultados -->
+    <!-- Vacío -->
     <div v-else-if="docentesFiltrados.length === 0" class="empty-state card">
-      <div class="empty-icon">
-        <svg viewBox="0 0 24 24" width="40" height="40" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round">
-          <circle cx="12" cy="12" r="10"/>
-          <line x1="8" y1="15" x2="16" y2="15"/>
-          <line x1="9" y1="9" x2="9.01" y2="9"/>
-          <line x1="15" y1="9" x2="15.01" y2="9"/>
-        </svg>
-      </div>
       <h3>No se encontraron docentes</h3>
-      <p>No existen registros que coincidan con los filtros aplicados o aún no has registrado docentes.</p>
-      <button class="btn btn-secondary" @click="filtroBusqueda = ''; filtroAsignatura = ''">
-        Limpiar Filtros
-      </button>
+      <p>No existen registros que coincidan con los filtros aplicados.</p>
     </div>
 
-    <!-- Tabla administrativa de docentes -->
+    <!-- Tabla administrativa -->
     <div v-else class="table-responsive">
       <table class="admin-table">
         <thead>
@@ -247,13 +265,12 @@ function mostrarToast(mensaje, tipo = 'success') {
             <th>Docente</th>
             <th>Contacto</th>
             <th>Título & Experiencia</th>
-            <th>Asignatura (Materia de Enseñanza)</th>
-            <th style="text-align: right;">Acciones</th>
+            <th>Asignatura Asignada (Materia Activa)</th>
+            <th class="no-print" style="text-align: right;">Acciones</th>
           </tr>
         </thead>
         <tbody>
           <tr v-for="docente in docentesFiltrados" :key="docente.id">
-            <!-- Columna: Docente -->
             <td>
               <div class="docente-profile">
                 <div class="avatar-circle">
@@ -266,18 +283,17 @@ function mostrarToast(mensaje, tipo = 'success') {
               </div>
             </td>
 
-            <!-- Columna: Contacto -->
             <td>
               <div class="contact-info">
                 <div class="contact-email">
-                  <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                  <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none">
                     <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
                     <polyline points="22,6 12,13 2,6"/>
                   </svg>
                   <span>{{ docente.email }}</span>
                 </div>
                 <div v-if="docente.telefono" class="contact-phone">
-                  <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                  <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none">
                     <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
                   </svg>
                   <span>{{ docente.telefono }}</span>
@@ -285,15 +301,13 @@ function mostrarToast(mensaje, tipo = 'success') {
               </div>
             </td>
 
-            <!-- Columna: Formación y Años de Experiencia -->
             <td>
               <div class="academic-title">{{ docente.tituloAcademico }}</div>
               <div class="experience-tag">
-                <span class="badge badge-warning">{{ docente.experienciaAnos }} años de experiencia</span>
+                <span class="badge badge-warning">{{ docente.experienciaAnos }} años exp.</span>
               </div>
             </td>
 
-            <!-- Columna: Asignatura de Enseñanza Asignada -->
             <td>
               <div v-if="docente.asignatura" class="subject-box">
                 <span class="badge badge-primary">
@@ -307,33 +321,33 @@ function mostrarToast(mensaje, tipo = 'success') {
                 <span class="subject-details">{{ docente.asignatura.creditos }} créditos • {{ docente.asignatura.horasSemanales }}h/sem</span>
               </div>
               <div v-else class="no-subject">
-                <span class="badge badge-warning">Sin materia asignada</span>
+                <span class="badge badge-warning">Sin materia</span>
               </div>
             </td>
 
-            <!-- Columna: Acciones Administrativas -->
-            <td style="text-align: right;">
+            <td class="no-print" style="text-align: right;">
               <div class="actions-group">
-                <!-- Botón: Editar y Reasignar Materia -->
+                <!-- Editar y Reasignar -->
                 <button 
                   class="btn-icon btn-icon-edit" 
-                  title="Editar información o cambiar asignatura asignada"
+                  title="Editar datos o reasignar materia de enseñanza"
                   @click="abrirModalEditar(docente)"
                 >
-                  <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                  <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none">
                     <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
                     <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
                   </svg>
-                  <span>Editar / Cambiar Materia</span>
+                  <span>Editar / Reasignar</span>
                 </button>
 
-                <!-- Botón: Eliminar Docente -->
+                <!-- Eliminar: Bloqueado o restringido a ADMIN -->
                 <button 
+                  v-if="authService.esAdmin.value"
                   class="btn-icon btn-icon-delete" 
-                  title="Eliminar docente de la base de datos"
+                  title="Eliminar docente de la base de datos (Exclusivo ADMIN)"
                   @click="solicitarEliminarDocente(docente)"
                 >
-                  <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                  <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none">
                     <polyline points="3 6 5 6 21 6"/>
                     <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
                     <line x1="10" y1="11" x2="10" y2="17"/>
@@ -347,7 +361,7 @@ function mostrarToast(mensaje, tipo = 'success') {
       </table>
     </div>
 
-    <!-- Modal para Crear / Editar Docente y Reasignar Asignatura -->
+    <!-- Modales -->
     <DocenteModal 
       :visible="modalDocenteVisible"
       :modo-edicion="modoEdicion"
@@ -358,17 +372,15 @@ function mostrarToast(mensaje, tipo = 'success') {
       @guardar="guardarDocente"
     />
 
-    <!-- Modal de confirmación para eliminar docente -->
     <ConfirmModal 
       :visible="modalConfirmVisible"
-      titulo="¿Eliminar Docente?"
-      :mensaje="docenteAEliminar ? `¿Confirmas que deseas eliminar permanentemente a ${docenteAEliminar.nombre} ${docenteAEliminar.apellidos}? Esta operación eliminará el registro de la base de datos.` : ''"
+      titulo="¿Eliminar Docente de la Base de Datos?"
+      :mensaje="docenteAEliminar ? `¿Confirmas que deseas eliminar permanentemente a ${docenteAEliminar.nombre} ${docenteAEliminar.apellidos}? Esta operación es irreversible.` : ''"
       :cargando="eliminandoDocente"
       @cancelar="modalConfirmVisible = false"
       @confirmar="confirmarEliminacion"
     />
 
-    <!-- Notificación Toast reactiva -->
     <ToastNotification 
       :visible="toast.visible"
       :mensaje="toast.mensaje"
@@ -379,7 +391,6 @@ function mostrarToast(mensaje, tipo = 'success') {
 </template>
 
 <style scoped>
-/* Estilos principales de la vista de docentes */
 .view-header {
   display: flex;
   justify-content: space-between;
@@ -399,6 +410,13 @@ function mostrarToast(mensaje, tipo = 'success') {
   font-size: 0.9rem;
   color: var(--text-muted);
   margin-top: 0.25rem;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
 }
 
 .filters-card {
@@ -432,7 +450,6 @@ function mostrarToast(mensaje, tipo = 'success') {
   min-width: 220px;
 }
 
-/* Avatar del docente */
 .docente-profile {
   display: flex;
   align-items: center;
@@ -450,7 +467,6 @@ function mostrarToast(mensaje, tipo = 'success') {
   justify-content: center;
   font-weight: 700;
   font-size: 0.875rem;
-  letter-spacing: 0.05em;
   flex-shrink: 0;
 }
 
@@ -465,7 +481,6 @@ function mostrarToast(mensaje, tipo = 'success') {
   color: var(--text-muted);
 }
 
-/* Información de contacto */
 .contact-info {
   display: flex;
   flex-direction: column;
@@ -480,7 +495,6 @@ function mostrarToast(mensaje, tipo = 'success') {
   color: var(--text-secondary);
 }
 
-/* Formación académica */
 .academic-title {
   font-weight: 600;
   color: var(--text-primary);
@@ -491,7 +505,6 @@ function mostrarToast(mensaje, tipo = 'success') {
   margin-top: 0.3rem;
 }
 
-/* Asignatura asignada */
 .subject-box {
   display: flex;
   flex-direction: column;
@@ -510,7 +523,6 @@ function mostrarToast(mensaje, tipo = 'success') {
   color: var(--text-muted);
 }
 
-/* Grupo de botones de acción */
 .actions-group {
   display: inline-flex;
   align-items: center;
@@ -552,7 +564,6 @@ function mostrarToast(mensaje, tipo = 'success') {
   background-color: #fee2e2;
 }
 
-/* Estado de carga y vacío */
 .loading-state, .empty-state {
   text-align: center;
   padding: 3.5rem 1.5rem;
@@ -560,17 +571,6 @@ function mostrarToast(mensaje, tipo = 'success') {
   flex-direction: column;
   align-items: center;
   gap: 1rem;
-}
-
-.empty-icon {
-  width: 70px;
-  height: 70px;
-  background-color: #f1f5f9;
-  color: var(--text-muted);
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
 }
 
 .spinner {
@@ -584,5 +584,22 @@ function mostrarToast(mensaje, tipo = 'success') {
 
 @keyframes spin {
   to { transform: rotate(360deg); }
+}
+
+/* Reglas de impresión para generar el reporte en PDF */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  .app-container {
+    background: #ffffff !important;
+  }
+  .admin-navbar, .admin-footer {
+    display: none !important;
+  }
+  .admin-table th, .admin-table td {
+    padding: 0.5rem !important;
+    font-size: 0.8rem !important;
+  }
 }
 </style>

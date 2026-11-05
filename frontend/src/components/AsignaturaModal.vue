@@ -98,7 +98,7 @@ function manejarEnvio() {
       <form @submit.prevent="manejarEnvio" novalidate>
         <!-- Campo: Nombre de la Asignatura -->
         <div class="form-group">
-          <label class="form-label" for="asig-nombre">Nombre de la Asignatura *</label>
+          <label class="form-label" for="asig-nombre">Nombre de la Asignatura (Único) *</label>
           <input 
             id="asig-nombre" 
             v-model="formulario.nombre" 
@@ -113,7 +113,7 @@ function manejarEnvio() {
         <div class="form-grid">
           <!-- Campo: Código Único -->
           <div class="form-group">
-            <label class="form-label" for="asig-codigo">Código de la Materia *</label>
+            <label class="form-label" for="asig-codigo">Código de la Materia (Único) *</label>
             <input 
               id="asig-codigo" 
               v-model="formulario.codigo" 

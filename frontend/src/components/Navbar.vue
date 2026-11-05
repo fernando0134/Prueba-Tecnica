@@ -1,18 +1,24 @@
 <script setup>
-// Defino los enlaces de navegación activa utilizando Vue Router
-import { RouterLink, useRoute } from 'vue-router';
+// Defino los enlaces de navegación activa y el servicio de autenticación
+import { RouterLink, useRoute, useRouter } from 'vue-router';
+import { authService } from '../services/authService';
 
-// Obtengo la ruta actual para aplicar estilos al enlace activo
 const route = useRoute();
+const router = useRouter();
+
+// Cierro la sesión y redirijo a la pantalla de login
+function cerrarSesion() {
+  authService.logout();
+  router.push('/login');
+}
 </script>
 
 <template>
-  <!-- Creo la barra de navegación superior con diseño administrativo -->
+  <!-- Barra de navegación superior con soporte de identidad de usuario y roles -->
   <header class="admin-navbar">
     <div class="navbar-container">
       <div class="navbar-brand">
         <div class="brand-icon">
-          <!-- Ícono académico SVG -->
           <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
             <path d="M22 10v6M2 10l10-5 10 5-10 5z"/>
             <path d="M6 12v5c3 3 9 3 12 0v-5"/>
@@ -24,18 +30,16 @@ const route = useRoute();
         </div>
       </div>
 
-      <!-- Menú de navegación principal entre Docentes y Asignaturas -->
-      <nav class="navbar-nav">
+      <!-- Menú de navegación visible sólo si el usuario está autenticado -->
+      <nav v-if="authService.estaAutenticado.value" class="navbar-nav">
         <RouterLink 
           to="/docentes" 
           class="nav-item" 
           :class="{ 'active': route.path === '/docentes' || route.path === '/' }"
         >
-          <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
+          <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none">
             <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
             <circle cx="9" cy="7" r="4"/>
-            <path d="M22 21v-2a4 4 0 0 0-3-3.87"/>
-            <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
           </svg>
           <span>Docentes</span>
         </RouterLink>
@@ -45,7 +49,7 @@ const route = useRoute();
           class="nav-item" 
           :class="{ 'active': route.path === '/asignaturas' }"
         >
-          <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
+          <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none">
             <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
             <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
           </svg>
@@ -53,8 +57,30 @@ const route = useRoute();
         </RouterLink>
       </nav>
 
-      <!-- Indicador de conexión con el backend -->
-      <div class="navbar-status">
+      <!-- Bloque de usuario autenticado con rol y botón de desconexión -->
+      <div v-if="authService.estaAutenticado.value" class="user-block">
+        <div class="user-info">
+          <span class="user-name">{{ authService.usuario.value?.nombre }}</span>
+          <span 
+            class="badge" 
+            :class="authService.esAdmin.value ? 'badge-primary' : 'badge-warning'"
+          >
+            {{ authService.usuario.value?.rol }}
+          </span>
+        </div>
+
+        <button class="btn btn-secondary btn-logout" @click="cerrarSesion" title="Cerrar Sesión">
+          <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none">
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+            <polyline points="16 17 21 12 16 7"/>
+            <line x1="21" y1="12" x2="9" y2="12"/>
+          </svg>
+          <span>Salir</span>
+        </button>
+      </div>
+
+      <!-- Estado cuando está en la pantalla de Login -->
+      <div v-else class="navbar-status">
         <span class="status-indicator-dot"></span>
         <span class="status-indicator-text">API Conectada</span>
       </div>
@@ -63,7 +89,6 @@ const route = useRoute();
 </template>
 
 <style scoped>
-/* Estilos con los que doy formato al encabezado del portal */
 .admin-navbar {
   background-color: #ffffff;
   border-bottom: 1px solid var(--border-color);
@@ -146,6 +171,30 @@ const route = useRoute();
   box-shadow: var(--shadow-sm);
 }
 
+.user-block {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.user-info {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.2rem;
+}
+
+.user-name {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.btn-logout {
+  padding: 0.45rem 0.75rem;
+  font-size: 0.8rem;
+}
+
 .navbar-status {
   display: flex;
   align-items: center;
@@ -166,14 +215,13 @@ const route = useRoute();
   box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.2);
 }
 
-@media (max-width: 768px) {
+@media (max-width: 800px) {
   .navbar-container {
     flex-direction: column;
     align-items: stretch;
-    gap: 1rem;
   }
-  .navbar-status {
-    display: none;
+  .user-block {
+    justify-content: space-between;
   }
 }
 </style>

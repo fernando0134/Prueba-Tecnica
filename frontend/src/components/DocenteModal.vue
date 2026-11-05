@@ -61,7 +61,8 @@ watch(
           asignaturaId: props.docenteInicial.asignaturaId || (props.docenteInicial.asignatura ? props.docenteInicial.asignatura.id : ''),
         };
       } else {
-        // Reinicio los campos para registrar un nuevo docente
+        // Busco la primera asignatura ACTIVA disponible para asignarla por defecto
+        const primeraActiva = props.asignaturas.find((a) => a.activo);
         formulario.value = {
           nombre: '',
           apellidos: '',
@@ -69,7 +70,7 @@ watch(
           telefono: '',
           tituloAcademico: '',
           experienciaAnos: 0,
-          asignaturaId: props.asignaturas.length > 0 ? props.asignaturas[0].id : '',
+          asignaturaId: primeraActiva ? primeraActiva.id : '',
         };
       }
     }
@@ -77,12 +78,11 @@ watch(
   { immediate: true }
 );
 
-// Limpio el objeto de errores de validación
 function limpiarErrores() {
   errores.value = {};
 }
 
-// Valido los datos ingresados en el formulario antes de emitir el guardado
+// Valido los datos ingresados en el formulario aplicando las reglas de negocio institucionales
 function validarFormulario() {
   const errs = {};
 
@@ -98,7 +98,7 @@ function validarFormulario() {
   if (!formulario.value.email.trim()) {
     errs.email = 'El correo electrónico es obligatorio.';
   } else if (!emailRegex.test(formulario.value.email)) {
-    errs.email = 'Ingresa un formato de correo válido.';
+    errs.email = 'Ingresa un formato de correo electrónico válido.';
   }
 
   if (!formulario.value.tituloAcademico.trim()) {
@@ -111,6 +111,12 @@ function validarFormulario() {
 
   if (!formulario.value.asignaturaId) {
     errs.asignaturaId = 'Debes asignar obligatoriamente una materia al docente.';
+  } else {
+    // REGLA DE NEGOCIO EN CLIENTE: Verificar que la materia esté ACTIVA
+    const asigSeleccionada = props.asignaturas.find((a) => a.id === Number(formulario.value.asignaturaId));
+    if (asigSeleccionada && !asigSeleccionada.activo) {
+      errs.asignaturaId = 'No puedes asignar una materia inactiva. Cada docente debe pertenecer a una asignatura activa.';
+    }
   }
 
   errores.value = errs;
@@ -121,7 +127,6 @@ function validarFormulario() {
 function manejarEnvio() {
   if (!validarFormulario()) return;
 
-  // Emito la información lista hacia la vista para comunicarse con la API
   emit('guardar', {
     ...formulario.value,
     asignaturaId: Number(formulario.value.asignaturaId),
@@ -129,21 +134,19 @@ function manejarEnvio() {
   });
 }
 
-// Título dinámico del modal
 const tituloModal = computed(() => {
   return props.modoEdicion ? 'Actualizar Información de Docente' : 'Registrar Nuevo Docente';
 });
 </script>
 
 <template>
-  <!-- Modal de creación y edición de docente con reasignación de asignatura -->
   <div v-if="props.visible" class="modal-overlay" @click.self="emit('cerrar')">
     <div class="modal-content">
       <div class="modal-header">
         <div>
           <h2 class="modal-title">{{ tituloModal }}</h2>
           <p class="modal-subtitle">
-            {{ props.modoEdicion ? 'Modifica los datos del docente o cambia su asignatura asignada.' : 'Completa la información básica y asigna una materia de enseñanza.' }}
+            {{ props.modoEdicion ? 'Modifica los datos del docente o reasigna su materia de enseñanza activa.' : 'Completa los datos del docente y vincúlalo a una asignatura activa.' }}
           </p>
         </div>
         <button class="modal-close-btn" @click="emit('cerrar')" aria-label="Cerrar modal">&times;</button>
@@ -151,7 +154,6 @@ const tituloModal = computed(() => {
 
       <form @submit.prevent="manejarEnvio" novalidate>
         <div class="form-grid">
-          <!-- Campo: Nombre -->
           <div class="form-group">
             <label class="form-label" for="docente-nombre">Nombre(s) *</label>
             <input 
@@ -165,7 +167,6 @@ const tituloModal = computed(() => {
             <span v-if="errores.nombre" class="form-error">{{ errores.nombre }}</span>
           </div>
 
-          <!-- Campo: Apellidos -->
           <div class="form-group">
             <label class="form-label" for="docente-apellidos">Apellidos *</label>
             <input 
@@ -181,9 +182,8 @@ const tituloModal = computed(() => {
         </div>
 
         <div class="form-grid">
-          <!-- Campo: Correo Electrónico -->
           <div class="form-group">
-            <label class="form-label" for="docente-email">Correo Electrónico *</label>
+            <label class="form-label" for="docente-email">Correo Electrónico (Único) *</label>
             <input 
               id="docente-email" 
               v-model="formulario.email" 
@@ -195,7 +195,6 @@ const tituloModal = computed(() => {
             <span v-if="errores.email" class="form-error">{{ errores.email }}</span>
           </div>
 
-          <!-- Campo: Teléfono -->
           <div class="form-group">
             <label class="form-label" for="docente-telefono">Teléfono (Opcional)</label>
             <input 
@@ -209,7 +208,6 @@ const tituloModal = computed(() => {
         </div>
 
         <div class="form-grid">
-          <!-- Campo: Título Académico -->
           <div class="form-group">
             <label class="form-label" for="docente-titulo">Título Académico *</label>
             <input 
@@ -223,7 +221,6 @@ const tituloModal = computed(() => {
             <span v-if="errores.tituloAcademico" class="form-error">{{ errores.tituloAcademico }}</span>
           </div>
 
-          <!-- Campo: Años de Experiencia -->
           <div class="form-group">
             <label class="form-label" for="docente-experiencia">Años de Experiencia *</label>
             <input 
@@ -239,11 +236,11 @@ const tituloModal = computed(() => {
           </div>
         </div>
 
-        <!-- Campo CRÍTICO: Asignatura Asignada (Selector para asignar o cambiar materia) -->
+        <!-- Selector de Asignatura: Sólo activas -->
         <div class="form-group highlight-group">
           <label class="form-label" for="docente-asignatura">
             <span class="badge badge-primary">Materia Asignada</span>
-            Asignatura de Trabajo / Enseñanza *
+            Asignatura Activa de Trabajo / Enseñanza *
           </label>
           <select 
             id="docente-asignatura" 
@@ -251,22 +248,22 @@ const tituloModal = computed(() => {
             class="form-select"
             :class="{ 'is-invalid': errores.asignaturaId }"
           >
-            <option value="" disabled>-- Selecciona una asignatura disponible --</option>
+            <option value="" disabled>-- Selecciona una asignatura activa disponible --</option>
             <option 
               v-for="asig in props.asignaturas" 
               :key="asig.id" 
               :value="asig.id"
+              :disabled="!asig.activo"
             >
-              {{ asig.nombre }} (Código: {{ asig.codigo }} | {{ asig.creditos }} Créditos)
+              {{ asig.nombre }} ({{ asig.codigo }} | {{ asig.creditos }} Créditos) {{ !asig.activo ? '— [INACTIVA: No elegible]' : '' }}
             </option>
           </select>
           <span v-if="errores.asignaturaId" class="form-error">{{ errores.asignaturaId }}</span>
           <p class="field-hint">
-            💡 Puedes cambiar la asignatura asignada a este docente en cualquier momento.
+            🔒 Cada docente debe pertenecer a una asignatura activa. Las materias dadas de baja o en revisión no pueden ser seleccionadas.
           </p>
         </div>
 
-        <!-- Botones de Acción -->
         <div class="modal-footer">
           <button 
             type="button" 
@@ -291,7 +288,6 @@ const tituloModal = computed(() => {
 </template>
 
 <style scoped>
-/* Estilos del encabezado del modal */
 .modal-header {
   display: flex;
   justify-content: space-between;

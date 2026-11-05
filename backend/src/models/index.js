@@ -2,12 +2,13 @@
 const { sequelize } = require('../config/database');
 const Docente = require('./Docente');
 const Asignatura = require('./Asignatura');
+const Usuario = require('./Usuario');
 
-// Establezco la relación: un Docente pertenece a una Asignatura
+// Establezco la relación: un Docente pertenece obligatoriamente a una Asignatura
 Docente.belongsTo(Asignatura, {
   foreignKey: 'asignaturaId',
   as: 'asignatura',
-  onDelete: 'RESTRICT', // Evito borrar una asignatura si aún tiene docentes impartiéndola
+  onDelete: 'RESTRICT', // Evito borrar una asignatura si aún tiene docentes asignados
   onUpdate: 'CASCADE',
 });
 
@@ -19,9 +20,10 @@ Asignatura.hasMany(Docente, {
   onUpdate: 'CASCADE',
 });
 
-// Agrupo y exporto los modelos junto con la instancia de conexión para sincronización
+// Agrupo y exporto los modelos para su uso en controladores y servicios
 module.exports = {
   sequelize,
   Docente,
   Asignatura,
+  Usuario,
 };

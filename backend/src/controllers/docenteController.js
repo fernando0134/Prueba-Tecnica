@@ -1,12 +1,12 @@
-// Importo los modelos Docente y Asignatura desde mi capa de modelos
-const { Docente, Asignatura } = require('../models');
+// Importo los modelos Docente y Asignatura y operadores de Sequelize
+const { Op } = require('sequelize');
+const { Docente, Asignatura, sequelize } = require('../models');
 
-// Implemento el controlador para la gestión completa de docentes
+// Implemento el controlador para la gestión completa de docentes y su regla de pertenencia a asignatura activa
 const docenteController = {
-  // Obtengo todos los docentes registrados, incluyendo la información de su asignatura asignada
+  // Obtengo todos los docentes registrados con su asignatura asignada
   obtenerTodos: async (req, res, next) => {
     try {
-      // Consulto los docentes e incluyo el modelo Asignatura relacionado
       const docentes = await Docente.findAll({
         order: [['id', 'DESC']],
         include: [
@@ -18,7 +18,6 @@ const docenteController = {
         ],
       });
 
-      // Retorno la respuesta con el listado de docentes y sus asignaturas
       return res.status(200).json({
         success: true,
         total: docentes.length,
@@ -30,23 +29,21 @@ const docenteController = {
     }
   },
 
-  // Obtengo un docente específico mediante su ID, con los datos de su asignatura asignada
+  // Obtengo un docente por ID con los datos de su materia de enseñanza
   obtenerPorId: async (req, res, next) => {
     try {
       const { id } = req.params;
 
-      // Busco al docente por su clave primaria e incluyo su asignatura
       const docente = await Docente.findByPk(id, {
         include: [
           {
             model: Asignatura,
             as: 'asignatura',
-            attributes: ['id', 'nombre', 'codigo', 'descripcion', 'creditos', 'horasSemanales'],
+            attributes: ['id', 'nombre', 'codigo', 'descripcion', 'creditos', 'horasSemanales', 'activo'],
           },
         ],
       });
 
-      // Si no existe el docente en la base de datos, retorno 404
       if (!docente) {
         return res.status(404).json({
           success: false,
@@ -54,7 +51,6 @@ const docenteController = {
         });
       }
 
-      // Retorno los datos del docente encontrado
       return res.status(200).json({
         success: true,
         message: 'Docente encontrado exitosamente.',
@@ -65,7 +61,7 @@ const docenteController = {
     }
   },
 
-  // Creo un nuevo docente vinculando obligatoriamente su asignatura asignada
+  // Creo un nuevo docente validando que pertenezca obligatoriamente a una asignatura ACTIVA
   crear: async (req, res, next) => {
     try {
       const {
@@ -78,24 +74,35 @@ const docenteController = {
         asignaturaId,
       } = req.body;
 
-      // Verifico que la asignatura asignada exista en la base de datos
+      // Verifico que la asignatura asignada exista en el catálogo institucional
       const asignaturaExistente = await Asignatura.findByPk(asignaturaId);
       if (!asignaturaExistente) {
         return res.status(404).json({
           success: false,
-          message: `La asignatura con ID ${asignaturaId} no existe. No puedo asignar una asignatura inexistente.`,
+          message: `La asignatura con ID ${asignaturaId} no existe en la base de datos.`,
         });
       }
 
-      // Verifico si el correo electrónico ya está registrado por otro docente
+      // REGLA DE NEGOCIO: Cada docente debe pertenecer a una asignatura ACTIVA
+      if (!asignaturaExistente.activo) {
+        return res.status(400).json({
+          success: false,
+          message: `La asignatura '${asignaturaExistente.nombre}' (${asignaturaExistente.codigo}) se encuentra inactiva. Por regla de negocio, cada docente debe pertenecer a una asignatura activa.`,
+        });
+      }
+
+      // Verifico que el correo electrónico no esté duplicado (insensible a mayúsculas/minúsculas)
       const emailExistente = await Docente.findOne({
-        where: { email: email.trim().toLowerCase() },
+        where: sequelize.where(
+          sequelize.fn('LOWER', sequelize.col('email')),
+          email.trim().toLowerCase()
+        ),
       });
 
       if (emailExistente) {
         return res.status(409).json({
           success: false,
-          message: `El correo electrónico '${email}' ya se encuentra registrado para otro docente.`,
+          message: `El correo electrónico '${email.trim().toLowerCase()}' ya se encuentra registrado para otro docente. El correo debe ser único.`,
         });
       }
 
@@ -116,15 +123,14 @@ const docenteController = {
           {
             model: Asignatura,
             as: 'asignatura',
-            attributes: ['id', 'nombre', 'codigo', 'creditos', 'horasSemanales'],
+            attributes: ['id', 'nombre', 'codigo', 'creditos', 'horasSemanales', 'activo'],
           },
         ],
       });
 
-      // Retorno respuesta con código 201 Created
       return res.status(201).json({
         success: true,
-        message: 'Docente creado y asignatura asignada con éxito.',
+        message: 'Docente creado y vinculado exitosamente a su asignatura activa.',
         data: docenteCompleto,
       });
     } catch (error) {
@@ -132,7 +138,7 @@ const docenteController = {
     }
   },
 
-  // Actualizo la información de un docente con la posibilidad de modificar su asignatura asignada
+  // Actualizo la información del docente con la posibilidad de modificar su asignatura asignada (debe ser activa)
   actualizar: async (req, res, next) => {
     try {
       const { id } = req.params;
@@ -146,7 +152,6 @@ const docenteController = {
         asignaturaId,
       } = req.body;
 
-      // Busco al docente que se desea actualizar
       const docente = await Docente.findByPk(id);
 
       if (!docente) {
@@ -156,7 +161,7 @@ const docenteController = {
         });
       }
 
-      // Si se desea modificar la asignatura asignada, valido que la nueva asignatura exista
+      // Si se desea modificar la asignatura asignada, valido existencia y que esté ACTIVA
       if (asignaturaId !== undefined && Number(asignaturaId) !== docente.asignaturaId) {
         const nuevaAsignatura = await Asignatura.findByPk(asignaturaId);
         if (!nuevaAsignatura) {
@@ -165,18 +170,34 @@ const docenteController = {
             message: `La nueva asignatura con ID ${asignaturaId} no existe en la base de datos.`,
           });
         }
+
+        // REGLA DE NEGOCIO: La nueva asignatura debe estar activa
+        if (!nuevaAsignatura.activo) {
+          return res.status(400).json({
+            success: false,
+            message: `No puedes reasignar al docente a la materia '${nuevaAsignatura.nombre}' porque está inactiva. Cada docente debe pertenecer a una asignatura activa.`,
+          });
+        }
       }
 
       // Si se desea cambiar el correo electrónico, valido que no colisione con otro docente
-      if (email && email.trim().toLowerCase() !== docente.email) {
+      if (email && email.trim().toLowerCase() !== docente.email.toLowerCase()) {
         const emailDuplicado = await Docente.findOne({
-          where: { email: email.trim().toLowerCase() },
+          where: {
+            id: { [Op.ne]: id },
+            [Op.and]: [
+              sequelize.where(
+                sequelize.fn('LOWER', sequelize.col('email')),
+                email.trim().toLowerCase()
+              ),
+            ],
+          },
         });
 
         if (emailDuplicado) {
           return res.status(409).json({
             success: false,
-            message: `El correo electrónico '${email}' ya pertenece a otro docente.`,
+            message: `El correo electrónico '${email.trim().toLowerCase()}' ya pertenece a otro docente registrado.`,
           });
         }
       }
@@ -192,20 +213,20 @@ const docenteController = {
         ...(asignaturaId !== undefined && { asignaturaId: Number(asignaturaId) }),
       });
 
-      // Recargo la instancia para devolver los datos actualizados junto a su asignatura
+      // Recargo la instancia con su asignatura asignada
       const docenteActualizado = await Docente.findByPk(docente.id, {
         include: [
           {
             model: Asignatura,
             as: 'asignatura',
-            attributes: ['id', 'nombre', 'codigo', 'creditos', 'horasSemanales'],
+            attributes: ['id', 'nombre', 'codigo', 'creditos', 'horasSemanales', 'activo'],
           },
         ],
       });
 
       return res.status(200).json({
         success: true,
-        message: 'Información del docente y su asignatura asignada actualizada correctamente.',
+        message: 'Información del docente y su asignatura de enseñanza actualizada correctamente.',
         data: docenteActualizado,
       });
     } catch (error) {
@@ -218,7 +239,6 @@ const docenteController = {
     try {
       const { id } = req.params;
 
-      // Busco al docente para verificar su existencia
       const docente = await Docente.findByPk(id);
 
       if (!docente) {
@@ -230,7 +250,6 @@ const docenteController = {
 
       const nombreCompleto = `${docente.nombre} ${docente.apellidos}`;
 
-      // Procedo a eliminar físicamente al docente de la base de datos
       await docente.destroy();
 
       return res.status(200).json({

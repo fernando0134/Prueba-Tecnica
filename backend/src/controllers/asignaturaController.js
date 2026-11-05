@@ -1,7 +1,8 @@
-// Importo los modelos Asignatura y Docente desde mi directorio de modelos
-const { Asignatura, Docente } = require('../models');
+// Importo los modelos Asignatura y Docente, y la función Sequelize para consultas avanzadas
+const { Op } = require('sequelize');
+const { Asignatura, Docente, sequelize } = require('../models');
 
-// Implemento el controlador para gestionar las asignaturas
+// Implemento el controlador para gestionar las asignaturas cumpliendo las reglas de negocio
 const asignaturaController = {
   // Obtengo el listado completo de asignaturas con sus docentes asociados
   obtenerTodas: async (req, res, next) => {
@@ -26,17 +27,15 @@ const asignaturaController = {
         data: asignaturas,
       });
     } catch (error) {
-      // Si ocurre un error, lo envío al middleware centralizado de errores
       next(error);
     }
   },
 
-  // Obtengo una asignatura específica a partir de su ID recibido en los parámetros
+  // Obtengo una asignatura específica a partir de su ID
   obtenerPorId: async (req, res, next) => {
     try {
       const { id } = req.params;
 
-      // Busco la asignatura por clave primaria incluyendo sus docentes
       const asignatura = await Asignatura.findByPk(id, {
         include: [
           {
@@ -47,7 +46,6 @@ const asignaturaController = {
         ],
       });
 
-      // Si no encuentro la asignatura, respondo con un 404
       if (!asignatura) {
         return res.status(404).json({
           success: false,
@@ -55,7 +53,6 @@ const asignaturaController = {
         });
       }
 
-      // Retorno la asignatura encontrada
       return res.status(200).json({
         success: true,
         message: 'Asignatura encontrada exitosamente.',
@@ -66,12 +63,27 @@ const asignaturaController = {
     }
   },
 
-  // Creo una nueva asignatura en la base de datos
+  // Creo una nueva asignatura validando que tanto el nombre como el código sean estrictamente únicos
   crear: async (req, res, next) => {
     try {
       const { nombre, codigo, descripcion, creditos, horasSemanales, activo } = req.body;
 
-      // Verifico preventivamente si ya existe una asignatura con el mismo código
+      // Verifico que el nombre de la asignatura no exista previamente (insensible a mayúsculas)
+      const existeNombre = await Asignatura.findOne({
+        where: sequelize.where(
+          sequelize.fn('LOWER', sequelize.col('nombre')),
+          nombre.trim().toLowerCase()
+        ),
+      });
+
+      if (existeNombre) {
+        return res.status(409).json({
+          success: false,
+          message: `Ya existe una asignatura registrada con el nombre '${nombre.trim()}'. El nombre debe ser único.`,
+        });
+      }
+
+      // Verifico que el código de la asignatura no exista previamente
       const existeCodigo = await Asignatura.findOne({
         where: { codigo: codigo.trim().toUpperCase() },
       });
@@ -79,7 +91,7 @@ const asignaturaController = {
       if (existeCodigo) {
         return res.status(409).json({
           success: false,
-          message: `Ya existe una asignatura registrada con el código '${codigo.trim().toUpperCase()}'.`,
+          message: `Ya existe una asignatura registrada con el código '${codigo.trim().toUpperCase()}'. El código debe ser único.`,
         });
       }
 
@@ -93,7 +105,6 @@ const asignaturaController = {
         activo: activo !== undefined ? Boolean(activo) : true,
       });
 
-      // Respondo con código 201 Created y la nueva entidad
       return res.status(201).json({
         success: true,
         message: 'Asignatura creada satisfactoriamente.',
@@ -104,13 +115,12 @@ const asignaturaController = {
     }
   },
 
-  // Actualizo la información de una asignatura existente
+  // Actualizo la información de una asignatura existente validando unicidad de nombre y código
   actualizar: async (req, res, next) => {
     try {
       const { id } = req.params;
       const { nombre, codigo, descripcion, creditos, horasSemanales, activo } = req.body;
 
-      // Busco la asignatura que deseo actualizar
       const asignatura = await Asignatura.findByPk(id);
 
       if (!asignatura) {
@@ -120,16 +130,52 @@ const asignaturaController = {
         });
       }
 
+      // Si se modifica el nombre, compruebo que ninguna otra asignatura lo tenga registrado
+      if (nombre && nombre.trim().toLowerCase() !== asignatura.nombre.toLowerCase()) {
+        const nombreDuplicado = await Asignatura.findOne({
+          where: {
+            id: { [Op.ne]: id },
+            [Op.and]: [
+              sequelize.where(
+                sequelize.fn('LOWER', sequelize.col('nombre')),
+                nombre.trim().toLowerCase()
+              ),
+            ],
+          },
+        });
+
+        if (nombreDuplicado) {
+          return res.status(409).json({
+            success: false,
+            message: `El nombre '${nombre.trim()}' ya pertenece a otra asignatura registrada.`,
+          });
+        }
+      }
+
       // Si se envía un nuevo código, compruebo que no pertenezca a otra asignatura distinta
       if (codigo && codigo.trim().toUpperCase() !== asignatura.codigo) {
         const codigoDuplicado = await Asignatura.findOne({
-          where: { codigo: codigo.trim().toUpperCase() },
+          where: {
+            id: { [Op.ne]: id },
+            codigo: codigo.trim().toUpperCase(),
+          },
         });
 
         if (codigoDuplicado) {
           return res.status(409).json({
             success: false,
             message: `El código '${codigo.trim().toUpperCase()}' ya está en uso por otra asignatura.`,
+          });
+        }
+      }
+
+      // Si se intenta desactivar una asignatura que tiene docentes, advierto o valido
+      if (activo === false) {
+        const docentesAsignados = await Docente.count({ where: { asignaturaId: id } });
+        if (docentesAsignados > 0) {
+          return res.status(400).json({
+            success: false,
+            message: `No puedes desactivar esta asignatura porque tiene ${docentesAsignados} docente(s) en activo. Reasigna los docentes primero.`,
           });
         }
       }
@@ -144,7 +190,6 @@ const asignaturaController = {
         ...(activo !== undefined && { activo: Boolean(activo) }),
       });
 
-      // Retorno la entidad actualizada
       return res.status(200).json({
         success: true,
         message: 'Asignatura actualizada exitosamente.',
@@ -155,12 +200,11 @@ const asignaturaController = {
     }
   },
 
-  // Elimino una asignatura de la base de datos
+  // Elimino una asignatura garantizando estrictamente que no tenga docentes asignados
   eliminar: async (req, res, next) => {
     try {
       const { id } = req.params;
 
-      // Busco la asignatura existente
       const asignatura = await Asignatura.findByPk(id);
 
       if (!asignatura) {
@@ -170,25 +214,25 @@ const asignaturaController = {
         });
       }
 
-      // Verifico si existen docentes asignados a esta asignatura antes de borrar
+      // Verifico estrictamente si existen docentes asignados a esta materia
       const docentesAsociados = await Docente.count({
         where: { asignaturaId: id },
       });
 
-      // Si tiene docentes asignados, restrinjo la eliminación para proteger la integridad relacional
+      // Si tiene docentes asignados, bloqueo rotundamente la eliminación
       if (docentesAsociados > 0) {
         return res.status(400).json({
           success: false,
-          message: `No puedo eliminar la asignatura '${asignatura.nombre}' porque tiene ${docentesAsociados} docente(s) asignado(s). Reasigna o elimina los docentes primero.`,
+          message: `No es posible eliminar la asignatura '${asignatura.nombre}' porque tiene ${docentesAsociados} docente(s) asignado(s). Para proteger la integridad académica, debes reasignar o eliminar los docentes antes de borrar la materia.`,
         });
       }
 
-      // Procedo a destruir el registro de la base de datos
+      // Destruyo el registro si no tiene ninguna relación docente activa
       await asignatura.destroy();
 
       return res.status(200).json({
         success: true,
-        message: `La asignatura '${asignatura.nombre}' ha sido eliminada correctamente.`,
+        message: `La asignatura '${asignatura.nombre}' ha sido eliminada correctamente de la base de datos.`,
       });
     } catch (error) {
       next(error);

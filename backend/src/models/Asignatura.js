@@ -2,7 +2,7 @@
 const { DataTypes } = require('sequelize');
 const { sequelize } = require('../config/database');
 
-// Defino el modelo Asignatura con sus respectivos campos y restricciones
+// Defino el modelo Asignatura asegurando la unicidad tanto del nombre como del código
 const Asignatura = sequelize.define('Asignatura', {
   id: {
     type: DataTypes.INTEGER,
@@ -14,6 +14,9 @@ const Asignatura = sequelize.define('Asignatura', {
   nombre: {
     type: DataTypes.STRING(100),
     allowNull: false,
+    unique: {
+      msg: 'Ya existe una asignatura registrada con este nombre.',
+    },
     validate: {
       notNull: {
         msg: 'El nombre de la asignatura es obligatorio.',
@@ -90,6 +93,7 @@ const Asignatura = sequelize.define('Asignatura', {
     type: DataTypes.BOOLEAN,
     defaultValue: true,
     allowNull: false,
+    comment: 'Indica si la asignatura está activa para asignación docente',
   },
 }, {
   tableName: 'asignaturas',

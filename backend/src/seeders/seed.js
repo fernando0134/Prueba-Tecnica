@@ -2,19 +2,38 @@
 const dotenv = require('dotenv');
 dotenv.config();
 
-// Importo Sequelize y mis modelos
-const { sequelize, Docente, Asignatura } = require('../models');
+// Importo Sequelize y mis modelos incluyendo Usuario
+const { sequelize, Docente, Asignatura, Usuario } = require('../models');
 
-// Defino mi función para sembrar la base de datos con datos de prueba realistas
+// Defino mi función para sembrar la base de datos con usuarios administrativos, asignaturas y docentes
 const sembrarDatos = async () => {
   try {
-    console.log('🌱 [Seeder]: Iniciando la carga de datos iniciales...');
+    console.log('🌱 [Seeder]: Iniciando la carga de datos iniciales con soporte de seguridad y roles...');
 
-    // Sincronizo la base de datos recreando las tablas limpias para evitar duplicados
+    // Sincronizo la base de datos aplicando DROP TABLE IF EXISTS para reiniciar limpiamente
     await sequelize.sync({ force: true });
-    console.log('🔄 [Seeder]: Tablas reiniciadas con éxito.');
+    console.log('🔄 [Seeder]: Tablas reiniciadas con éxito (DROP TABLE IF EXISTS ejecutado).');
 
-    // Creo un conjunto de asignaturas iniciales
+    // 1. Creo los usuarios del sistema para control de acceso y roles
+    const admin = await Usuario.create({
+      nombre: 'Administrador General',
+      email: 'admin@universidad.edu',
+      password: 'Admin123*',
+      rol: 'ADMIN',
+      activo: true,
+    });
+
+    const coordinador = await Usuario.create({
+      nombre: 'Coordinador Académico',
+      email: 'coordinador@universidad.edu',
+      password: 'Coord123*',
+      rol: 'COORDINADOR',
+      activo: true,
+    });
+
+    console.log(`✅ [Seeder]: Creé 2 usuarios administrativos (Admin: ${admin.email} | Coord: ${coordinador.email}).`);
+
+    // 2. Creo un conjunto de asignaturas iniciales activas (nombres y códigos únicos)
     const asignaturasCreadas = await Asignatura.bulkCreate([
       {
         nombre: 'Programación Web y Frontend',
@@ -56,11 +75,19 @@ const sembrarDatos = async () => {
         horasSemanales: 4,
         activo: true,
       },
+      {
+        nombre: 'Materia en Revisión (Inactiva)',
+        codigo: 'INF-999',
+        descripcion: 'Materia dada de baja temporalmente para pruebas de validación de negocio.',
+        creditos: 2,
+        horasSemanales: 2,
+        activo: false, // Materia inactiva para probar que no se permite asignar docentes a ella
+      },
     ]);
 
-    console.log(`✅ [Seeder]: Creé ${asignaturasCreadas.length} asignaturas.`);
+    console.log(`✅ [Seeder]: Creé ${asignaturasCreadas.length} asignaturas (incluyendo 1 inactiva para pruebas).`);
 
-    // Creo docentes de prueba vinculados a las asignaturas recién creadas
+    // 3. Creo docentes vinculados únicamente a asignaturas ACTIVAS
     const docentesCreados = await Docente.bulkCreate([
       {
         nombre: 'Elena',
@@ -69,7 +96,7 @@ const sembrarDatos = async () => {
         telefono: '+52 55 1234 5678',
         tituloAcademico: 'Doctora en Ciencias de la Computación',
         experienciaAnos: 8,
-        asignaturaId: asignaturasCreadas[0].id, // Asignada a Programación Web
+        asignaturaId: asignaturasCreadas[0].id, // Asignada a Programación Web (Activa)
       },
       {
         nombre: 'Alejandro',
@@ -78,7 +105,7 @@ const sembrarDatos = async () => {
         telefono: '+52 55 8765 4321',
         tituloAcademico: 'Magíster en Ingeniería de Software',
         experienciaAnos: 6,
-        asignaturaId: asignaturasCreadas[1].id, // Asignado a Bases de Datos
+        asignaturaId: asignaturasCreadas[1].id, // Asignado a Bases de Datos (Activa)
       },
       {
         nombre: 'Sofía',
@@ -87,7 +114,7 @@ const sembrarDatos = async () => {
         telefono: '+52 55 5555 4444',
         tituloAcademico: 'Especialista en Arquitectura Cloud',
         experienciaAnos: 10,
-        asignaturaId: asignaturasCreadas[2].id, // Asignada a Arquitectura de Software
+        asignaturaId: asignaturasCreadas[2].id, // Asignada a Arquitectura de Software (Activa)
       },
       {
         nombre: 'Martín',
@@ -96,14 +123,13 @@ const sembrarDatos = async () => {
         telefono: '+52 55 9999 1111',
         tituloAcademico: 'Magíster en Inteligencia Artificial',
         experienciaAnos: 5,
-        asignaturaId: asignaturasCreadas[3].id, // Asignado a Inteligencia Artificial
+        asignaturaId: asignaturasCreadas[3].id, // Asignado a Inteligencia Artificial (Activa)
       },
     ]);
 
-    console.log(`✅ [Seeder]: Creé ${docentesCreados.length} docentes vinculados a sus asignaturas.`);
-    console.log('🎉 [Seeder]: Proceso de sembrado completado con total éxito.');
+    console.log(`✅ [Seeder]: Creé ${docentesCreados.length} docentes vinculados a asignaturas activas.`);
+    console.log('🎉 [Seeder]: Base de datos sembrada y lista para su uso con seguridad.');
 
-    // Cierro la conexión a la base de datos al finalizar
     await sequelize.close();
     process.exit(0);
   } catch (error) {

@@ -1,14 +1,19 @@
-// Configuro la URL base de mi API (utilizo /api gracias al proxy de Vite o el puerto directo)
+// Importo el servicio de autenticación para inyectar el token JWT
+import { authService } from './authService';
+
 const BASE_URL = import.meta.env.VITE_API_URL || '/api';
 
-// Creo una función genérica para enviar peticiones HTTP y procesar las respuestas de forma unificada
+// Función centralizada para emitir solicitudes HTTP con cabecera de autenticación
 async function request(endpoint, options = {}) {
-  // Construyo la URL completa de la petición
   const url = `${BASE_URL}${endpoint}`;
 
-  // Defino las cabeceras predeterminadas con soporte para JSON
+  // Inyecto dinámicamente el token Bearer si existe una sesión activa
+  const token = authService.obtenerToken();
+  const authHeader = token ? { Authorization: `Bearer ${token}` } : {};
+
   const headers = {
     'Content-Type': 'application/json',
+    ...authHeader,
     ...options.headers,
   };
 
@@ -18,10 +23,8 @@ async function request(endpoint, options = {}) {
   };
 
   try {
-    // Realizo la llamada de red mediante fetch
     const response = await fetch(url, config);
 
-    // Intento parsear la respuesta como JSON
     let data;
     const contentType = response.headers.get('content-type');
     if (contentType && contentType.includes('application/json')) {
@@ -30,7 +33,12 @@ async function request(endpoint, options = {}) {
       data = { message: await response.text() };
     }
 
-    // Si la respuesta no es exitosa (códigos 4xx, 5xx), lanzo un error estructurado
+    // Si recibo un 401 Unauthorized, cierro la sesión automáticamente
+    if (response.status === 401 && !endpoint.includes('/auth/login')) {
+      authService.logout();
+      window.location.href = '/login';
+    }
+
     if (!response.ok) {
       const error = new Error(data.message || 'Ocurrió un error en la solicitud.');
       error.status = response.status;
@@ -38,16 +46,14 @@ async function request(endpoint, options = {}) {
       throw error;
     }
 
-    // Retorno la carga de datos procesada
     return data;
   } catch (error) {
-    // Registro el error en la consola para depuración
-    console.error(`❌ [API Service Error en ${options.method || 'GET'} ${url}]:`, error);
+    console.error(`❌ [API Error en ${options.method || 'GET'} ${url}]:`, error);
     throw error;
   }
 }
 
-// Exporto mi cliente API con métodos helper para GET, POST, PUT y DELETE
+// Exporto mi cliente API
 export const apiClient = {
   get: (endpoint) => request(endpoint, { method: 'GET' }),
   post: (endpoint, body) => request(endpoint, { method: 'POST', body: JSON.stringify(body) }),
