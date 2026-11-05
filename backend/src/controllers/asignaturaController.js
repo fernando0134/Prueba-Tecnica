@@ -169,6 +169,16 @@ const asignaturaController = {
         }
       }
 
+      // REGLA DE NIVEL: Sólo ADMIN puede activar o desactivar una materia curricular
+      if (activo !== undefined && Boolean(activo) !== asignatura.activo) {
+        if (!req.usuario || req.usuario.rol !== 'ADMIN') {
+          return res.status(403).json({
+            success: false,
+            message: 'Acceso denegado: Sólo los usuarios con rol ADMIN tienen autorización para cambiar el estado de activación de una asignatura.',
+          });
+        }
+      }
+
       // Si se intenta desactivar una asignatura que tiene docentes, advierto o valido
       if (activo === false) {
         const docentesAsignados = await Docente.count({ where: { asignaturaId: id } });

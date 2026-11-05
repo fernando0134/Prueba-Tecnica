@@ -1,6 +1,7 @@
 <script setup>
-// Importo utilidades reactivas desde Vue
+// Importo utilidades reactivas desde Vue y el servicio de autenticación
 import { ref, watch, computed } from 'vue';
+import { authService } from '../services/authService';
 
 // Defino las propiedades del modal de asignatura (soporta creación y edición)
 const props = defineProps({
@@ -187,13 +188,21 @@ const tituloModal = computed(() => {
             <span v-if="errores.horasSemanales" class="form-error">{{ errores.horasSemanales }}</span>
           </div>
 
-          <!-- Campo: Estado Activo / Inactivo -->
+          <!-- Campo: Estado Activo / Inactivo (Exclusivo ADMIN para cambiar) -->
           <div class="form-group">
             <label class="form-label" for="asig-activo">Estado Curricular</label>
-            <select id="asig-activo" v-model="formulario.activo" class="form-select">
+            <select 
+              id="asig-activo" 
+              v-model="formulario.activo" 
+              class="form-select"
+              :disabled="!authService.esAdmin.value"
+            >
               <option :value="true">Activa (Disponible para asignación)</option>
               <option :value="false">Inactiva (En revisión / Dada de baja)</option>
             </select>
+            <span v-if="!authService.esAdmin.value" class="field-hint" style="color: var(--text-muted); font-size: 0.725rem;">
+              🔒 Modificación de estado activo/inactivo reservada para rol ADMIN.
+            </span>
           </div>
         </div>
 

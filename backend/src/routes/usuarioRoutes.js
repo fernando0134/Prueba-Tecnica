@@ -6,13 +6,17 @@ const { verificarToken, verificarRol } = require('../middlewares/auth');
 // Inicializo el enrutador de usuarios
 const router = Router();
 
-// Ruta protegida exclusivamente para usuarios con rol ADMIN
-router.get(
-  '/',
-  verificarToken,
-  verificarRol(['ADMIN']),
-  usuarioController.obtenerTodos
-);
+// Aplico los middlewares para que TODAS las rutas de este módulo requieran autenticación y rol ADMIN
+router.use(verificarToken, verificarRol(['ADMIN']));
+
+// Consultar todas las cuentas de usuarios
+router.get('/', usuarioController.obtenerTodos);
+
+// Crear una nueva cuenta administrativa (Admin o Coordinador)
+router.post('/', usuarioController.crear);
+
+// Activar o suspender cuenta de usuario
+router.patch('/:id/estado', usuarioController.cambiarEstado);
 
 // Exporto mi enrutador de usuarios
 module.exports = router;
