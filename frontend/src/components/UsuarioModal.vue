@@ -64,23 +64,26 @@ watch(
   { immediate: true }
 );
 
-// Valido los datos antes de emitir
+// Valido los datos antes de emitir de forma estricta evitando coerción truthy/falsy
 function validar() {
   const errs = {};
-  if (!formulario.value.nombre.trim()) errs.nombre = 'El nombre es obligatorio.';
+  if (typeof formulario.value.nombre !== 'string' || formulario.value.nombre.trim().length === 0) {
+    errs.nombre = 'El nombre es obligatorio.';
+  }
   
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  if (!formulario.value.email.trim() || !emailRegex.test(formulario.value.email)) {
+  if (typeof formulario.value.email !== 'string' || formulario.value.email.trim().length === 0 || !emailRegex.test(formulario.value.email.trim())) {
     errs.email = 'Ingresa un correo electrónico válido.';
   }
 
-  // La contraseña es obligatoria en modo creación, pero opcional en edición
+  // La contraseña es obligatoria en modo creación (mínimo 6 caracteres), pero opcional en edición
+  const pass = formulario.value.password;
   if (!props.modoEdicion) {
-    if (!formulario.value.password || formulario.value.password.length < 6) {
+    if (typeof pass !== 'string' || pass.length < 6) {
       errs.password = 'La contraseña inicial debe tener al menos 6 caracteres.';
     }
   } else {
-    if (formulario.value.password && formulario.value.password.length < 6) {
+    if (typeof pass === 'string' && pass.length > 0 && pass.length < 6) {
       errs.password = 'Si deseas cambiar la contraseña, debe contener al menos 6 caracteres.';
     }
   }

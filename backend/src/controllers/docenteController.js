@@ -83,8 +83,8 @@ const docenteController = {
         });
       }
 
-      // REGLA DE NEGOCIO: Cada docente debe pertenecer a una asignatura ACTIVA
-      if (!asignaturaExistente.activo) {
+      // REGLA DE NEGOCIO: Cada docente debe pertenecer a una asignatura ACTIVA (comprobación booleana estricta, evito falsy)
+      if (asignaturaExistente.activo !== true) {
         return res.status(400).json({
           success: false,
           message: `La asignatura '${asignaturaExistente.nombre}' (${asignaturaExistente.codigo}) se encuentra inactiva. Por regla de negocio, cada docente debe pertenecer a una asignatura activa.`,
@@ -171,8 +171,8 @@ const docenteController = {
           });
         }
 
-        // REGLA DE NEGOCIO: La nueva asignatura debe estar activa
-        if (!nuevaAsignatura.activo) {
+        // REGLA DE NEGOCIO: La nueva asignatura debe estar activa (comprobación booleana estricta, evito falsy)
+        if (nuevaAsignatura.activo !== true) {
           return res.status(400).json({
             success: false,
             message: `No puedes reasignar al docente a la materia '${nuevaAsignatura.nombre}' porque está inactiva. Cada docente debe pertenecer a una asignatura activa.`,

@@ -54,10 +54,17 @@ const usuarioController = {
     try {
       const { nombre, email, password, rol } = req.body;
 
-      if (!nombre || !email || !password || !rol) {
+      // Valido de forma estricta evitando coerción truthy/falsy
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (
+        typeof nombre !== 'string' || nombre.trim().length === 0 ||
+        typeof email !== 'string' || email.trim().length === 0 || !emailRegex.test(email.trim()) ||
+        typeof password !== 'string' || password.trim().length < 6 ||
+        typeof rol !== 'string' || !['ADMIN', 'COORDINADOR'].includes(rol.trim().toUpperCase())
+      ) {
         return res.status(400).json({
           success: false,
-          message: 'Los campos nombre, email, password y rol son obligatorios.',
+          message: 'Los campos nombre, email válido, password (mínimo 6 caracteres) y rol (ADMIN o COORDINADOR) son obligatorios.',
         });
       }
 
@@ -78,8 +85,8 @@ const usuarioController = {
       const nuevoUsuario = await Usuario.create({
         nombre: nombre.trim(),
         email: email.trim().toLowerCase(),
-        password,
-        rol: rol.toUpperCase(),
+        password: password.trim(),
+        rol: rol.trim().toUpperCase(),
         activo: true,
       });
 
@@ -115,8 +122,8 @@ const usuarioController = {
         });
       }
 
-      // Verifico que el nuevo correo no esté registrado por otra cuenta distinta
-      if (email && email.trim().toLowerCase() !== usuario.email.toLowerCase()) {
+      // Verifico estrictamente que el nuevo correo sea texto no vacío y no esté duplicado
+      if (typeof email === 'string' && email.trim().length > 0 && email.trim().toLowerCase() !== usuario.email.toLowerCase()) {
         const emailDuplicado = await Usuario.findOne({
           where: {
             id: { [Op.ne]: id },
@@ -138,23 +145,23 @@ const usuarioController = {
       }
 
       // Protección: Evito que el administrador activo degrade su propio rol mientras está conectado
-      if (Number(id) === req.usuario.id && rol && rol.toUpperCase() !== 'ADMIN') {
+      if (Number(id) === req.usuario.id && typeof rol === 'string' && rol.trim().toUpperCase() !== 'ADMIN') {
         return res.status(400).json({
           success: false,
           message: 'Por seguridad, no puedes degradar tu propio rol de administrador en tu sesión activa.',
         });
       }
 
-      // Aplico los cambios a los campos recibidos
+      // Aplico los cambios a los campos recibidos validando tipos estrictos
       const datosActualizados = {
-        ...(nombre && { nombre: nombre.trim() }),
-        ...(email && { email: email.trim().toLowerCase() }),
-        ...(rol && ['ADMIN', 'COORDINADOR'].includes(rol.toUpperCase()) && { rol: rol.toUpperCase() }),
-        ...(activo !== undefined && { activo: Boolean(activo) }),
+        ...(typeof nombre === 'string' && nombre.trim().length > 0 && { nombre: nombre.trim() }),
+        ...(typeof email === 'string' && email.trim().length > 0 && { email: email.trim().toLowerCase() }),
+        ...(typeof rol === 'string' && ['ADMIN', 'COORDINADOR'].includes(rol.trim().toUpperCase()) && { rol: rol.trim().toUpperCase() }),
+        ...(activo !== undefined && activo !== null && { activo: Boolean(activo) }),
       };
 
       // Si se envía una nueva contraseña, la asigno (el hook beforeUpdate de Sequelize la hashea)
-      if (password && password.trim().length >= 6) {
+      if (typeof password === 'string' && password.trim().length >= 6) {
         datosActualizados.password = password.trim();
       }
 

@@ -25,11 +25,16 @@ const authController = {
     try {
       const { nombre, email, password, rol } = req.body;
 
-      // Valido campos básicos
-      if (!nombre || !email || !password) {
+      // Valido de forma estricta evitando coerción implícita truthy/falsy
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (
+        typeof nombre !== 'string' || nombre.trim().length === 0 ||
+        typeof email !== 'string' || email.trim().length === 0 || !emailRegex.test(email.trim()) ||
+        typeof password !== 'string' || password.trim().length < 6
+      ) {
         return res.status(400).json({
           success: false,
-          message: 'Los campos nombre, email y password son estrictamente obligatorios.',
+          message: 'Datos inválidos: nombre, email válido y password (mínimo 6 caracteres) son estrictamente obligatorios.',
         });
       }
 
@@ -46,11 +51,15 @@ const authController = {
       }
 
       // Creo el nuevo usuario (la contraseña se hashea en el hook beforeCreate)
+      const rolDefinido = typeof rol === 'string' && ['ADMIN', 'COORDINADOR'].includes(rol.trim().toUpperCase())
+        ? rol.trim().toUpperCase()
+        : 'COORDINADOR';
+
       const nuevoUsuario = await Usuario.create({
         nombre: nombre.trim(),
         email: email.trim().toLowerCase(),
-        password,
-        rol: rol && ['ADMIN', 'COORDINADOR'].includes(rol.toUpperCase()) ? rol.toUpperCase() : 'COORDINADOR',
+        password: password.trim(),
+        rol: rolDefinido,
       });
 
       // Genero el token JWT
@@ -77,7 +86,11 @@ const authController = {
     try {
       const { email, password } = req.body;
 
-      if (!email || !password) {
+      // Valido con comprobación estricta de tipos en lugar de evaluar verdad/falsedad difusa (truthy/falsy)
+      if (
+        typeof email !== 'string' || email.trim().length === 0 ||
+        typeof password !== 'string' || password.length === 0
+      ) {
         return res.status(400).json({
           success: false,
           message: 'Debes proporcionar tu correo electrónico y tu contraseña.',
@@ -96,8 +109,8 @@ const authController = {
         });
       }
 
-      // Verifico si el usuario se encuentra activo
-      if (!usuario.activo) {
+      // Verifico estrictamente si el usuario se encuentra activo (evito coerción truthy/falsy)
+      if (usuario.activo !== true) {
         return res.status(403).json({
           success: false,
           message: 'Tu cuenta administrativa se encuentra suspendida o inactiva.',

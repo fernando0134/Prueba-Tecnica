@@ -71,24 +71,26 @@ watch(
   { immediate: true }
 );
 
-// Valido los campos obligatorios antes de enviar
+// Valido los campos de forma estricta evitando coerción truthy/falsy
 function validarFormulario() {
   const errs = {};
 
-  if (!formulario.value.nombre.trim()) {
+  if (typeof formulario.value.nombre !== 'string' || formulario.value.nombre.trim().length === 0) {
     errs.nombre = 'El nombre de la asignatura es obligatorio.';
   }
 
-  if (!formulario.value.codigo.trim()) {
+  if (typeof formulario.value.codigo !== 'string' || formulario.value.codigo.trim().length === 0) {
     errs.codigo = 'El código de la materia es obligatorio.';
   }
 
-  if (!formulario.value.creditos || Number(formulario.value.creditos) < 1) {
-    errs.creditos = 'Los créditos deben ser al menos 1.';
+  const numCreditos = Number(formulario.value.creditos);
+  if (formulario.value.creditos === '' || formulario.value.creditos === null || isNaN(numCreditos) || numCreditos < 1) {
+    errs.creditos = 'Los créditos deben ser un número mayor o igual a 1.';
   }
 
-  if (!formulario.value.horasSemanales || Number(formulario.value.horasSemanales) < 1) {
-    errs.horasSemanales = 'Las horas semanales deben ser al menos 1.';
+  const numHoras = Number(formulario.value.horasSemanales);
+  if (formulario.value.horasSemanales === '' || formulario.value.horasSemanales === null || isNaN(numHoras) || numHoras < 1) {
+    errs.horasSemanales = 'Las horas semanales deben ser un número mayor o igual a 1.';
   }
 
   errores.value = errs;

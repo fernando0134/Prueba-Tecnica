@@ -82,39 +82,40 @@ function limpiarErrores() {
   errores.value = {};
 }
 
-// Valido los datos ingresados en el formulario aplicando las reglas de negocio institucionales
+// Valido los datos ingresados en el formulario de forma estricta evitando coerción truthy/falsy
 function validarFormulario() {
   const errs = {};
 
-  if (!formulario.value.nombre.trim()) {
+  if (typeof formulario.value.nombre !== 'string' || formulario.value.nombre.trim().length === 0) {
     errs.nombre = 'El nombre es obligatorio.';
   }
 
-  if (!formulario.value.apellidos.trim()) {
+  if (typeof formulario.value.apellidos !== 'string' || formulario.value.apellidos.trim().length === 0) {
     errs.apellidos = 'Los apellidos son obligatorios.';
   }
 
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  if (!formulario.value.email.trim()) {
+  if (typeof formulario.value.email !== 'string' || formulario.value.email.trim().length === 0) {
     errs.email = 'El correo electrónico es obligatorio.';
-  } else if (!emailRegex.test(formulario.value.email)) {
+  } else if (!emailRegex.test(formulario.value.email.trim())) {
     errs.email = 'Ingresa un formato de correo electrónico válido.';
   }
 
-  if (!formulario.value.tituloAcademico.trim()) {
+  if (typeof formulario.value.tituloAcademico !== 'string' || formulario.value.tituloAcademico.trim().length === 0) {
     errs.tituloAcademico = 'El título académico es obligatorio.';
   }
 
-  if (formulario.value.experienciaAnos === '' || Number(formulario.value.experienciaAnos) < 0) {
-    errs.experienciaAnos = 'Los años de experiencia deben ser mayor o igual a 0.';
+  const numExp = Number(formulario.value.experienciaAnos);
+  if (formulario.value.experienciaAnos === '' || formulario.value.experienciaAnos === null || isNaN(numExp) || numExp < 0) {
+    errs.experienciaAnos = 'Los años de experiencia deben ser un número mayor o igual a 0.';
   }
 
-  if (!formulario.value.asignaturaId) {
+  if (formulario.value.asignaturaId === '' || formulario.value.asignaturaId === null || formulario.value.asignaturaId === undefined) {
     errs.asignaturaId = 'Debes asignar obligatoriamente una materia al docente.';
   } else {
-    // REGLA DE NEGOCIO EN CLIENTE: Verificar que la materia esté ACTIVA
+    // REGLA DE NEGOCIO EN CLIENTE: Verificar que la materia esté ACTIVA de forma estricta
     const asigSeleccionada = props.asignaturas.find((a) => a.id === Number(formulario.value.asignaturaId));
-    if (asigSeleccionada && !asigSeleccionada.activo) {
+    if (asigSeleccionada && asigSeleccionada.activo !== true) {
       errs.asignaturaId = 'No puedes asignar una materia inactiva. Cada docente debe pertenecer a una asignatura activa.';
     }
   }

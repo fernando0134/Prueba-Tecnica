@@ -10,6 +10,7 @@ import { authService } from '../services/authService';
 // Importo componentes modulares
 import StatsOverview from '../components/StatsOverview.vue';
 import DocenteModal from '../components/DocenteModal.vue';
+import DocenteDetalleModal from '../components/DocenteDetalleModal.vue';
 import ConfirmModal from '../components/ConfirmModal.vue';
 import ToastNotification from '../components/ToastNotification.vue';
 
@@ -25,6 +26,9 @@ const modalDocenteVisible = ref(false);
 const modoEdicion = ref(false);
 const docenteSeleccionado = ref(null);
 const guardandoDocente = ref(false);
+
+const modalDetalleVisible = ref(false);
+const docenteDetalle = ref(null);
 
 const modalConfirmVisible = ref(false);
 const docenteAEliminar = ref(null);
@@ -91,6 +95,18 @@ function abrirModalEditar(docente) {
   modoEdicion.value = true;
   docenteSeleccionado.value = { ...docente };
   modalDocenteVisible.value = true;
+}
+
+// Abro el modal para consultar la ficha técnica y curricular del docente
+function consultarFicha(docente) {
+  docenteDetalle.value = docente;
+  modalDetalleVisible.value = true;
+}
+
+// Permito transicionar directamente desde la ficha técnica hacia el modal de edición
+function editarDesdeDetalle(docente) {
+  modalDetalleVisible.value = false;
+  abrirModalEditar(docente);
 }
 
 // Proceso el guardado con validación y manejo de errores de backend
@@ -327,13 +343,26 @@ function mostrarToast(mensaje, tipo = 'success') {
 
             <td class="no-print" style="text-align: right;">
               <div class="actions-group">
+                <!-- Consultar Ficha Técnica -->
+                <button 
+                  class="btn-icon btn-icon-view" 
+                  title="Consultar ficha técnica y curricular del docente"
+                  @click="consultarFicha(docente)"
+                >
+                  <svg viewBox="0 0 24 24" width="15" height="15" stroke="currentColor" stroke-width="2" fill="none">
+                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                    <circle cx="12" cy="12" r="3"/>
+                  </svg>
+                  <span>Ver Ficha</span>
+                </button>
+
                 <!-- Editar y Reasignar -->
                 <button 
                   class="btn-icon btn-icon-edit" 
                   title="Editar datos o reasignar materia de enseñanza"
                   @click="abrirModalEditar(docente)"
                 >
-                  <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none">
+                  <svg viewBox="0 0 24 24" width="15" height="15" stroke="currentColor" stroke-width="2" fill="none">
                     <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
                     <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
                   </svg>
@@ -370,6 +399,14 @@ function mostrarToast(mensaje, tipo = 'success') {
       :cargando="guardandoDocente"
       @cerrar="modalDocenteVisible = false"
       @guardar="guardarDocente"
+    />
+
+    <!-- Modal para Consultar Ficha Técnica del Docente -->
+    <DocenteDetalleModal 
+      :visible="modalDetalleVisible"
+      :docente="docenteDetalle"
+      @cerrar="modalDetalleVisible = false"
+      @editar="editarDesdeDetalle"
     />
 
     <ConfirmModal 
@@ -541,6 +578,15 @@ function mostrarToast(mensaje, tipo = 'success') {
   font-size: 0.8rem;
   font-weight: 600;
   transition: all 0.2s ease;
+}
+
+.btn-icon-view {
+  color: var(--text-secondary);
+}
+
+.btn-icon-view:hover {
+  background-color: #f1f5f9;
+  color: var(--text-primary);
 }
 
 .btn-icon-edit {

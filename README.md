@@ -115,7 +115,7 @@ Prueba-Tecnica/
 │   └── package.json
 ├── frontend/
 │   ├── src/
-│   │   ├── components/                 # Navbar, DocenteModal, AsignaturaModal, AsignaturaDetalleModal, UsuarioModal, UsuarioDetalleModal, ConfirmModal, Toast
+│   │   ├── components/                 # Navbar, DocenteModal, DocenteDetalleModal, AsignaturaModal, AsignaturaDetalleModal, UsuarioModal, UsuarioDetalleModal, ConfirmModal, Toast
 │   │   ├── views/                      # LoginView, DocentesView, AsignaturasView, UsuariosView
 │   │   ├── services/                   # api.js (inyecta JWT), authService.js, docenteService.js, asignaturaService.js
 │   │   ├── router/index.js             # Vue Router con guardianes de navegación y RBAC
@@ -241,3 +241,4 @@ npm run build:frontend # Compilar frontend para producción
 2. **Defensa en profundidad**: Validaciones defensivas tanto en la interfaz de usuario de Vue 3 como en los middlewares de Express y modelos de Sequelize.
 3. **Control granular de roles (RBAC)**: Autorización en endpoints críticos para salvaguardar la consistencia académica.
 4. **Formato nativo de exportación**: Codificación con BOM para integración directa con suites ofimáticas sin problemas de codificación.
+5. **Validaciones estrictas y tipadas (Sin coerción implícita Truthy / Falsy)**: Verificación explícita de tipos (`typeof`), longitud de texto no vacía tras `.trim()`, existencia explícita (`!== undefined && !== null`), y validación de enteros para evitar falsos positivos con valores numéricos válidos (como 0 años de experiencia) o cadenas con espacios en blanco.
