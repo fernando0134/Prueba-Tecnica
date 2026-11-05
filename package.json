@@ -6,14 +6,17 @@
     "start:backend": "npm --prefix backend start",
     "dev:backend": "npm --prefix backend run dev",
     "seed:backend": "npm --prefix backend run seed",
-    "test:backend": "npm --prefix backend test"
+    "test:backend": "npm --prefix backend test",
+    "dev:frontend": "npm --prefix frontend run dev",
+    "build:frontend": "npm --prefix frontend run build"
   },
   "keywords": [
     "nodejs",
     "express",
     "sequelize",
     "vue3",
-    "javascript"
+    "javascript",
+    "administrative-dashboard"
   ],
   "author": "",
   "license": "ISC"

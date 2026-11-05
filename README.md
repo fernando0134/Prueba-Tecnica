@@ -1,326 +1,242 @@
 # Sistema de Gestión de Docentes y Asignaturas 🎓
 
-Proyecto Fullstack compuesto por una **API RESTful** en el backend construida con **Node.js**, **Express.js** y **Sequelize ORM**, diseñada y estructurada para integrarse con un frontend en **Vue.js 3**.
+Plataforma Fullstack integral con temática administrativa académica para la gestión y control docente. Desarrollada con un **Backend en Node.js, Express.js y Sequelize ORM**, y un **Frontend moderno en Vue.js 3 (Composition API) con Vite y Vue Router**.
 
 ---
 
 ## 📋 Tabla de Contenidos
 
-1. [Características Principales](#-características-principales)
-2. [Estructura del Proyecto](#-estructura-del-proyecto)
-3. [Estrategia de Base de Datos y Comportamiento de Tablas](#-estrategia-de-base-de-datos-y-comportamiento-de-tablas)
-4. [Requisitos Previos](#-requisitos-previos)
+1. [Visión General del Proyecto](#-visión-general-del-proyecto)
+2. [Arquitectura del Sistema](#-arquitectura-del-sistema)
+   - [Estructura del Frontend (Vue.js 3)](#-estructura-del-frontend-vuejs-3)
+   - [Estructura del Backend (Node.js & Express)](#-estructura-del-backend-nodejs--express)
+3. [Funcionalidades de la Aplicación Frontend](#-funcionalidades-de-la-aplicación-frontend)
+4. [Estrategia de Base de Datos y Comportamiento de Tablas (`DROP TABLE IF EXISTS`)](#-estrategia-de-base-de-datos-y-comportamiento-de-tablas)
 5. [Instrucciones de Ejecución Paso a Paso](#-instrucciones-de-ejecución-paso-a-paso)
-6. [Catálogo Completo de la API RESTful](#-catálogo-completo-de-la-api-restful)
-   - [Endpoints de Asignaturas](#-endpoints-de-asignaturas)
-   - [Endpoints de Docentes](#-endpoints-de-docentes)
-   - [Health Check](#-health-check)
-7. [Buenas Prácticas Implementadas](#-buenas-prácticas-implementadas)
+   - [Paso 1: Levantar el Backend](#paso-1-levantar-el-backend)
+   - [Paso 2: Levantar el Frontend](#paso-2-levantar-el-frontend)
+   - [Comandos Rápidos desde la Raíz](#comandos-rápidos-desde-la-raíz)
+6. [Catálogo de la API RESTful](#-catálogo-de-la-api-restful)
+7. [Buenas Prácticas Aplicadas](#-buenas-prácticas-aplicadas)
 
 ---
 
-## ✨ Características Principales
+## 🌟 Visión General del Proyecto
 
-- **Gestión de Asignaturas**: Operaciones CRUD completas (Crear, Consultar, Actualizar y Eliminar asignaturas).
-- **Gestión de Docentes**: Creación con asignación obligatoria de asignatura, consulta detallada con datos de la asignatura, actualización con posibilidad de reasignar asignatura y eliminación.
-- **Integridad Referencial**: Restricción de eliminación de asignaturas que tienen docentes asignados (`RESTRICT`).
-- **Validaciones Rigurosas**: Middleware de validación para campos obligatorios, formato de correo electrónico, unicidad y tipos numéricos.
-- **Manejo Centralizado de Errores**: Respuestas normalizadas en JSON con códigos de estado HTTP semánticos (`200`, `201`, `400`, `404`, `409`, `500`).
-- **Documentación en Primera Persona**: Todo el código fuente está comentado en primera persona (*"Configuro...", "Defino...", "Valido...", "Obtengo..."*).
+He desarrollado esta solución pensando en los estándares de un panel administrativo institucional universitario, permitiendo a los coordinadores y administradores:
+- Visualizar el cuadro docente con sus asignaturas asignadas.
+- Contratar/Registrar nuevos docentes asociándoles su materia de especialidad.
+- Consultar las asignaturas disponibles en el plan de estudios y dar de alta nuevas asignaturas.
+- Reasignar o cambiar la materia de enseñanza de cualquier docente de forma interactiva.
+- Editar la información académica o eliminar docentes de la base de datos con confirmación de seguridad.
+- Visualizar métricas en tiempo real (total docentes, total materias, promedio de años de experiencia y materias activas).
 
 ---
 
-## 🏗️ Estructura del Proyecto
+## 🏗️ Arquitectura del Sistema
 
-He organizado el backend con una arquitectura modular por capas dentro de [`backend/`](file:///c:/Users/Estudiante/Desktop/Prueba-Tecnica/backend):
+El repositorio se divide limpiamente en dos módulos independientes:
 
 ```text
 Prueba-Tecnica/
-├── backend/
-│   ├── src/
-│   │   ├── config/
-│   │   │   └── database.js          # Conexión Sequelize (SQLite por defecto, compatible con PostgreSQL/MySQL)
-│   │   ├── models/
-│   │   │   ├── Asignatura.js        # Definición del modelo Asignatura (código, nombre, créditos, etc.)
-│   │   │   ├── Docente.js           # Definición del modelo Docente (nombre, email, título, asignaturaId, etc.)
-│   │   │   └── index.js             # Relaciones: Docente.belongsTo(Asignatura) y Asignatura.hasMany(Docente)
-│   │   ├── controllers/
-│   │   │   ├── asignaturaController.js # Lógica de negocio para asignaturas
-│   │   │   └── docenteController.js    # Lógica de negocio para docentes
-│   │   ├── routes/
-│   │   │   ├── asignaturaRoutes.js  # Rutas HTTP para asignaturas
-│   │   │   ├── docenteRoutes.js     # Rutas HTTP para docentes
-│   │   │   └── index.js             # Enrutador principal y Health Check
-│   │   ├── middlewares/
-│   │   │   ├── validators.js        # Validaciones de entrada para peticiones POST y PUT
-│   │   │   └── errorHandler.js      # Middleware de errores (Sequelize, 404, 500)
-│   │   ├── seeders/
-│   │   │   └── seed.js              # Sembrado con datos iniciales de prueba
-│   │   ├── app.js                   # Configuración de Express, CORS y parseo de peticiones
-│   │   └── server.js                # Punto de entrada y levantamiento del servidor HTTP
-│   ├── test-suite.js                # Batería automatizada de pruebas de integración (10 pruebas)
-│   ├── .env.example                 # Plantilla de variables de entorno
-│   ├── .env                         # Variables de entorno del servidor
-│   └── package.json                 # Dependencias y scripts de ejecución
-├── .gitignore                       # Ignora node_modules, .env y base de datos local
-├── package.json                     # Scripts rápidos para ejecutar el backend desde la raíz
-└── README.md                        # Documentación general del proyecto
+├── backend/                  # API RESTful con Express y Sequelize
+├── frontend/                 # Aplicación SPA con Vue.js 3 y Vite
+├── package.json              # Scripts orquestadores del proyecto completo
+└── README.md                 # Documentación técnica general
 ```
+
+### 💻 Estructura del Frontend (`Vue.js 3`)
+
+```text
+frontend/
+├── src/
+│   ├── assets/
+│   │   └── styles/
+│   │       └── main.css            # Estilos globales, variables CSS y diseño administrativo
+│   ├── components/
+│   │   ├── Navbar.vue              # Encabezado institucional con indicador de conexión a la API
+│   │   ├── StatsOverview.vue       # Tarjetas de estadísticas y métricas docentes
+│   │   ├── DocenteModal.vue        # Formulario modal para crear, editar y reasignar asignaturas
+│   │   ├── AsignaturaModal.vue     # Formulario modal para crear nuevas materias
+│   │   ├── ConfirmModal.vue        # Diálogo modal de confirmación para eliminaciones
+│   │   └── ToastNotification.vue   # Alertas flotantes (éxito y error)
+│   ├── views/
+│   │   ├── DocentesView.vue        # Vista principal: tabla de docentes, filtros, búsqueda y acciones
+│   │   └── AsignaturasView.vue     # Vista de catálogo de asignaturas con sus docentes asignados
+│   ├── services/
+│   │   ├── api.js                  # Cliente HTTP centralizado basado en fetch
+│   │   ├── docenteService.js       # Operaciones de red para docentes
+│   │   └── asignaturaService.js    # Operaciones de red para asignaturas
+│   ├── router/
+│   │   └── index.js                # Enrutador Vue Router (/docentes, /asignaturas)
+│   ├── App.vue                     # Layout principal con navegación y footer
+│   └── main.js                     # Inicialización y montaje de Vue 3
+├── index.html                      # Punto de entrada HTML con tipografía Inter / Plus Jakarta Sans
+├── vite.config.js                  # Configuración de Vite con proxy inverso para /api
+└── package.json                    # Dependencias de Vue 3, Vue Router y Vite
+```
+
+### ⚙️ Estructura del Backend (`Node.js & Express`)
+
+```text
+backend/
+├── src/
+│   ├── config/database.js          # Conexión Sequelize con SQLite (compatible con PostgreSQL)
+│   ├── models/                     # Modelos Docente y Asignatura con asociaciones 1:N
+│   ├── controllers/                # Lógica CRUD de asignaturas y docentes
+│   ├── routes/                     # Enrutadores Express modulares y Health Check
+│   ├── middlewares/                # Validadores de entrada y manejador global de errores
+│   ├── seeders/seed.js             # Sembrado de datos con reseteo (DROP TABLE IF EXISTS)
+│   ├── app.js                      # Configuración de Express y CORS
+│   └── server.js                   # Inicio del servidor HTTP
+├── test-suite.js                   # Batería de 10 pruebas automatizadas
+├── .env                            # Variables de entorno activas
+└── package.json                    # Dependencias y scripts
+```
+
+---
+
+## 🎯 Funcionalidades de la Aplicación Frontend
+
+1. **Visualizar la lista de docentes registrados:**
+   - Muestra tabla con avatar generado, nombre completo, correo, teléfono, título académico y años de experiencia.
+   - Muestra una tarjeta distintiva de la **asignatura de enseñanza asignada** con su código y créditos.
+   - Búsqueda en tiempo real por texto (nombre, apellido, email, título) y selector para filtrar por materia específica.
+
+2. **Registrar un nuevo docente:**
+   - Botón *"Registrar Nuevo Docente"* en el encabezado.
+   - Modal con validación defensiva en el cliente: nombre, apellidos, email (con validación de formato), teléfono opcional, título académico y años de experiencia.
+   - **Selector obligatorio de asignatura asignada**, cargado dinámicamente desde la base de datos.
+
+3. **Consultar y crear asignaturas (materias):**
+   - Vista dedicada en `/asignaturas` con tarjetas de cada materia, código oficial, créditos, horas semanales y lista de docentes que la imparten.
+   - Modal *"Crear Nueva Asignatura"* con validación de código único, nombre, créditos y horas.
+
+4. **Asignar o cambiar la asignatura de enseñanza:**
+   - Botón de acción *"Editar / Cambiar Materia"* en cada fila de docente.
+   - Permite al usuario modificar cualquier dato personal o seleccionar una nueva materia en el dropdown para reasignarlo inmediatamente.
+
+5. **Editar y Eliminar docentes:**
+   - Edición completa desde el modal interactivo.
+   - Botón de eliminación con modal de confirmación antes de impactar físicamente la base de datos.
+   - Notificaciones Toast en la esquina inferior derecha para confirmar el resultado de cada operación.
 
 ---
 
 ## 🗄️ Estrategia de Base de Datos y Comportamiento de Tablas
 
-### ¿Cómo maneja el proyecto el `DROP TABLE IF EXISTS`?
+He implementado una diferenciación clara entre el modo de sembrado y el modo de operación normal:
 
-El comportamiento se divide en dos modos claramente definidos para proteger los datos:
-
-1. **Modo Reinicio / Sembrado (`npm run seed`)**:
-   - En el archivo [`backend/src/seeders/seed.js`](file:///c:/Users/Estudiante/Desktop/Prueba-Tecnica/backend/src/seeders/seed.js) ejecuto:
-     ```javascript
-     await sequelize.sync({ force: true });
-     ```
-   - Esto ejecuta internamente:
+1. **Modo Reinicio / Sembrado (`npm run seed:backend` o `npm run seed`):**
+   - En [`backend/src/seeders/seed.js`](file:///c:/Users/Estudiante/Desktop/Prueba-Tecnica/backend/src/seeders/seed.js) ejecuto `await sequelize.sync({ force: true })`.
+   - **Esto ejecuta internamente el `DROP TABLE IF EXISTS`**:
      ```sql
      DROP TABLE IF EXISTS `docentes`;
      DROP TABLE IF EXISTS `asignaturas`;
      CREATE TABLE IF NOT EXISTS `asignaturas` (...);
      CREATE TABLE IF NOT EXISTS `docentes` (...);
      ```
-   - **Propósito**: Permite resetear la base de datos a un estado limpio con datos de prueba realistas cada vez que lo desees.
+   - Reinicia la base de datos dejando tablas limpias y pre-poblando 5 materias y 4 docentes de prueba.
 
-2. **Modo Servidor Normal (`npm start` o `npm run dev`)**:
-   - En el archivo [`backend/src/server.js`](file:///c:/Users/Estudiante/Desktop/Prueba-Tecnica/backend/src/server.js) ejecuto:
-     ```javascript
-     await sequelize.sync({ alter: false });
-     ```
-   - Esto ejecuta:
-     ```sql
-     CREATE TABLE IF NOT EXISTS `asignaturas` (...);
-     CREATE TABLE IF NOT EXISTS `docentes` (...);
-     ```
-   - **Propósito**: Garantiza que al iniciar o reiniciar el servidor **NO** se borren los datos que hayas registrado o modificado.
-
----
-
-## ⚙️ Requisitos Previos
-
-- **Node.js**: Versión 18 o superior (probado y funcionando en Node v22).
-- **NPM**: Gestor de paquetes incluido con Node.js.
+2. **Modo Normal del Servidor (`npm run dev:backend` o `npm start`):**
+   - En [`backend/src/server.js`](file:///c:/Users/Estudiante/Desktop/Prueba-Tecnica/backend/src/server.js) ejecuto `await sequelize.sync({ alter: false })`.
+   - **Utiliza `CREATE TABLE IF NOT EXISTS`**, garantizando que **no se borren** los docentes ni asignaturas cuando apagues o reinicies el servidor.
 
 ---
 
 ## 🚀 Instrucciones de Ejecución Paso a Paso
 
-### Opción A: Ejecutando desde la carpeta `backend`
+### Paso 1: Levantar el Backend
 
-1. **Entrar al directorio del backend:**
-   ```bash
-   cd backend
-   ```
+En una primera terminal:
 
-2. **Instalar dependencias:**
-   ```bash
-   npm install
-   ```
+```bash
+# 1. Acceder al directorio backend
+cd backend
 
-3. **Verificar el archivo `.env`:**
-   El archivo `.env` ya viene preconfigurado con SQLite (`DB_DIALECT=sqlite`, `PORT=3000`). Si necesitas crearlo manualmente:
-   ```bash
-   cp .env.example .env
-   ```
+# 2. Instalar dependencias (Express, Sequelize, SQLite3, CORS, etc.)
+npm install
 
-4. **Poblar la base de datos con datos de prueba:**
-   Ejecuta el script seeder para crear las tablas y cargar datos iniciales:
-   ```bash
-   npm run seed
-   ```
+# 3. Poblar la base de datos inicial (aplica DROP TABLE IF EXISTS y genera datos limpios)
+npm run seed
 
-5. **Ejecutar la suite de pruebas automatizadas:**
-   Comprueba que todos los endpoints (CRUDs y relaciones) funcionen al 100%:
-   ```bash
-   npm test
-   ```
+# 4. Iniciar el servidor backend en desarrollo
+npm run dev
+```
 
-6. **Iniciar el servidor en modo desarrollo (con recarga automática):**
-   ```bash
-   npm run dev
-   ```
-
-7. **O iniciar en modo estándar:**
-   ```bash
-   npm start
-   ```
-
-El servidor estará escuchando en: `http://localhost:3000`
+> 🟢 El backend quedará escuchando en `http://localhost:3000`.
 
 ---
 
-### Opción B: Ejecutando desde la raíz del proyecto
+### Paso 2: Levantar el Frontend
 
-Si te encuentras en la raíz `Prueba-Tecnica/`, he configurado scripts rápidos en el `package.json` principal:
+En una segunda terminal:
 
-- **Poblar datos:** `npm run seed:backend`
-- **Correr pruebas:** `npm run test:backend`
-- **Iniciar servidor en desarrollo:** `npm run dev:backend`
-- **Iniciar servidor estándar:** `npm run start:backend`
+```bash
+# 1. Acceder al directorio frontend
+cd frontend
+
+# 2. Instalar dependencias (Vue 3, Vue Router, Vite)
+npm install
+
+# 3. Iniciar el servidor de desarrollo Vite
+npm run dev
+```
+
+> 🌐 El frontend se abrirá en tu navegador en: **`http://localhost:5173`**
 
 ---
 
-## 📡 Catálogo Completo de la API RESTful
+### ⚡ Comandos Rápidos desde la Raíz del Proyecto
 
-La URL base es: `http://localhost:3000/api`
+Si prefieres ejecutar desde la carpeta raíz `Prueba-Tecnica/`:
 
-### 🩺 Health Check
+```bash
+# Sembrar la base de datos con datos de prueba
+npm run seed:backend
 
-#### `GET /api/health`
-Verifica que la API esté activa y respondiendo.
+# Ejecutar las pruebas unitarias del backend (10/10 pasando)
+npm run test:backend
 
-- **Respuesta (200 OK):**
-```json
-{
-  "success": true,
-  "message": "API RESTful operativa y funcionando al 100%.",
-  "timestamp": "2026-11-05T19:30:00.000Z"
-}
+# Iniciar el backend
+npm run dev:backend
+
+# Iniciar el frontend
+npm run dev:frontend
+
+# Compilar el frontend para producción
+npm run build:frontend
 ```
 
 ---
 
-### 📖 Endpoints de Asignaturas
+## 📡 Catálogo de la API RESTful
 
-| Método | Endpoint | Descripción | Código Éxito |
-| :--- | :--- | :--- | :--- |
-| **GET** | `/api/asignaturas` | Lista todas las asignaturas junto a los docentes asignados | `200 OK` |
-| **GET** | `/api/asignaturas/:id` | Obtiene el detalle de una asignatura por su ID | `200 OK` |
-| **POST** | `/api/asignaturas` | Crea una nueva asignatura | `201 Created` |
-| **PUT** | `/api/asignaturas/:id` | Actualiza la información de una asignatura | `200 OK` |
-| **DELETE** | `/api/asignaturas/:id` | Elimina una asignatura (si no tiene docentes asignados) | `200 OK` |
+La API se encuentra en `http://localhost:3000/api` y cuenta con los siguientes endpoints:
 
-#### Ejemplo de Creación de Asignatura:
-- **Petición (`POST /api/asignaturas`):**
-```json
-{
-  "nombre": "Desarrollo Web Frontend con Vue.js",
-  "codigo": "VUE-301",
-  "descripcion": "Fundamentos de Vue 3, Composition API, Pinia y Router.",
-  "creditos": 4,
-  "horasSemanales": 5
-}
-```
+### Docentes (`/api/docentes`)
+- `GET /api/docentes` - Lista todos los docentes junto a su materia asignada.
+- `GET /api/docentes/:id` - Detalle de un docente específico con su asignatura.
+- `POST /api/docentes` - Crea un docente validando que la materia asignada exista.
+- `PUT /api/docentes/:id` - Actualiza datos y permite reasignar la materia (`asignaturaId`).
+- `DELETE /api/docentes/:id` - Elimina un docente de la base de datos.
 
-- **Respuesta (201 Created):**
-```json
-{
-  "success": true,
-  "message": "Asignatura creada satisfactoriamente.",
-  "data": {
-    "id": 6,
-    "nombre": "Desarrollo Web Frontend con Vue.js",
-    "codigo": "VUE-301",
-    "descripcion": "Fundamentos de Vue 3, Composition API, Pinia y Router.",
-    "creditos": 4,
-    "horasSemanales": 5,
-    "activo": true,
-    "updatedAt": "2026-11-05T19:30:00.000Z",
-    "createdAt": "2026-11-05T19:30:00.000Z"
-  }
-}
-```
+### Asignaturas (`/api/asignaturas`)
+- `GET /api/asignaturas` - Lista las asignaturas junto a sus docentes asignados.
+- `GET /api/asignaturas/:id` - Detalle de una asignatura.
+- `POST /api/asignaturas` - Crea una nueva materia con código único.
+- `PUT /api/asignaturas/:id` - Actualiza información de la materia.
+- `DELETE /api/asignaturas/:id` - Elimina una materia (protegida si tiene docentes activos).
+
+### Health Check
+- `GET /api/health` - Comprueba que la API esté 100% activa.
 
 ---
 
-### 👨‍🏫 Endpoints de Docentes
+## 🛡️ Buenas Prácticas Aplicadas
 
-| Método | Endpoint | Descripción | Código Éxito |
-| :--- | :--- | :--- | :--- |
-| **GET** | `/api/docentes` | Lista todos los docentes con la información de su asignatura | `200 OK` |
-| **GET** | `/api/docentes/:id` | Obtiene el detalle de un docente por su ID con su asignatura | `200 OK` |
-| **POST** | `/api/docentes` | Crea un nuevo docente con asignatura obligatoria asignada | `201 Created` |
-| **PUT** | `/api/docentes/:id` | Actualiza los datos del docente y/o reasigna su asignatura | `200 OK` |
-| **DELETE** | `/api/docentes/:id` | Elimina un docente de la base de datos | `200 OK` |
-
-#### Ejemplo de Creación de Docente:
-- **Petición (`POST /api/docentes`):**
-```json
-{
-  "nombre": "Mariana",
-  "apellidos": "López Duarte",
-  "email": "mariana.lopez@universidad.edu",
-  "telefono": "+52 55 4433 2211",
-  "tituloAcademico": "Ingeniera de Software",
-  "experienciaAnos": 5,
-  "asignaturaId": 1
-}
-```
-
-- **Respuesta (201 Created):**
-```json
-{
-  "success": true,
-  "message": "Docente creado y asignatura asignada con éxito.",
-  "data": {
-    "id": 5,
-    "nombre": "Mariana",
-    "apellidos": "López Duarte",
-    "email": "mariana.lopez@universidad.edu",
-    "telefono": "+52 55 4433 2211",
-    "tituloAcademico": "Ingeniera de Software",
-    "experienciaAnos": 5,
-    "asignaturaId": 1,
-    "createdAt": "2026-11-05T19:30:00.000Z",
-    "updatedAt": "2026-11-05T19:30:00.000Z",
-    "asignatura": {
-      "id": 1,
-      "nombre": "Programación Web y Frontend",
-      "codigo": "INF-301",
-      "creditos": 4,
-      "horasSemanales": 5
-    }
-  }
-}
-```
-
-#### Ejemplo de Actualización y Reasignación de Asignatura:
-- **Petición (`PUT /api/docentes/5`):**
-```json
-{
-  "experienciaAnos": 6,
-  "asignaturaId": 2
-}
-```
-
-- **Respuesta (200 OK):**
-```json
-{
-  "success": true,
-  "message": "Información del docente y su asignatura asignada actualizada correctamente.",
-  "data": {
-    "id": 5,
-    "nombre": "Mariana",
-    "apellidos": "López Duarte",
-    "email": "mariana.lopez@universidad.edu",
-    "telefono": "+52 55 4433 2211",
-    "tituloAcademico": "Ingeniera de Software",
-    "experienciaAnos": 6,
-    "asignaturaId": 2,
-    "asignatura": {
-      "id": 2,
-      "nombre": "Bases de Datos y ORM",
-      "codigo": "INF-302",
-      "creditos": 4,
-      "horasSemanales": 4
-    }
-  }
-}
-```
-
----
-
-## 🛡️ Buenas Prácticas Implementadas
-
-1. **Separación de responsabilidades**: Estructura modular dividida en configuración, modelos, controladores, rutas y validadores.
-2. **CORS abierto**: Preparado para la conexión directa con el cliente de Vue.js 3 en desarrollo.
-3. **Validación defensiva**: Evita inconsistencias antes de llegar a la base de datos.
-4. **Respuestas unificadas**: Todas las respuestas devuelven `{ success, message, data }` o `{ success, message, errors }`.
-5. **Comentarios en primera persona**: Redactados de manera explicativa en cada archivo para seguir la directriz del proyecto.
+1. **Documentación en primera persona**: El 100% del código fuente tanto en el Backend como en el Frontend contiene comentarios redactados en primera persona (*"Inicializo...", "Defino...", "Valido...", "Obtengo..."*).
+2. **Arquitectura modular por componentes**: Separación nítida en componentes reutilizables (`Navbar`, `StatsOverview`, `DocenteModal`, `AsignaturaModal`, `ConfirmModal`, `ToastNotification`).
+3. **Manejo de estados de carga y retroalimentación**: Spinners de carga, vistas de estado vacío y notificaciones Toast contextuales.
+4. **Validaciones en ambos lados**: Validación defensiva en cliente para prevenir llamadas innecesarias y validaciones de integridad referencial en el backend con Sequelize.
+5. **Proxy inverso en Vite**: Configuración de proxy para `/api` evitando bloqueos de origen cruzado en entorno de desarrollo.
