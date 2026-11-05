@@ -1,12 +1,20 @@
 <script setup>
 // Importo utilidades reactivas desde Vue
-import { ref, watch } from 'vue';
+import { ref, watch, computed } from 'vue';
 
-// Defino las propiedades del modal de usuario
+// Defino las propiedades del modal de usuario (soporta registro y edición)
 const props = defineProps({
   visible: {
     type: Boolean,
     default: false,
+  },
+  modoEdicion: {
+    type: Boolean,
+    default: false,
+  },
+  usuarioInicial: {
+    type: Object,
+    default: () => ({}),
   },
   cargando: {
     type: Boolean,
@@ -28,20 +36,32 @@ const formulario = ref({
 // Errores locales
 const errores = ref({});
 
-// Reinicio el formulario al abrir el modal
+// Observo cambios en la visibilidad o usuario inicial para inicializar campos
 watch(
   () => props.visible,
   (estaVisible) => {
     if (estaVisible) {
       errores.value = {};
-      formulario.value = {
-        nombre: '',
-        email: '',
-        password: '',
-        rol: 'COORDINADOR',
-      };
+      if (props.modoEdicion && props.usuarioInicial) {
+        // Cargo los datos de la cuenta existente
+        formulario.value = {
+          nombre: props.usuarioInicial.nombre || '',
+          email: props.usuarioInicial.email || '',
+          password: '', // En edición, la contraseña se deja vacía si no se desea cambiar
+          rol: props.usuarioInicial.rol || 'COORDINADOR',
+        };
+      } else {
+        // Reinicio los campos para nueva cuenta
+        formulario.value = {
+          nombre: '',
+          email: '',
+          password: '',
+          rol: 'COORDINADOR',
+        };
+      }
     }
-  }
+  },
+  { immediate: true }
 );
 
 // Valido los datos antes de emitir
@@ -54,8 +74,15 @@ function validar() {
     errs.email = 'Ingresa un correo electrónico válido.';
   }
 
-  if (!formulario.value.password || formulario.value.password.length < 6) {
-    errs.password = 'La contraseña debe tener al menos 6 caracteres.';
+  // La contraseña es obligatoria en modo creación, pero opcional en edición
+  if (!props.modoEdicion) {
+    if (!formulario.value.password || formulario.value.password.length < 6) {
+      errs.password = 'La contraseña inicial debe tener al menos 6 caracteres.';
+    }
+  } else {
+    if (formulario.value.password && formulario.value.password.length < 6) {
+      errs.password = 'Si deseas cambiar la contraseña, debe contener al menos 6 caracteres.';
+    }
   }
 
   errores.value = errs;
@@ -66,6 +93,10 @@ function manejarEnvio() {
   if (!validar()) return;
   emit('guardar', { ...formulario.value });
 }
+
+const tituloModal = computed(() => {
+  return props.modoEdicion ? 'Actualizar Cuenta de Personal' : 'Registrar Nueva Cuenta de Personal';
+});
 </script>
 
 <template>
@@ -73,8 +104,10 @@ function manejarEnvio() {
     <div class="modal-content">
       <div class="modal-header">
         <div>
-          <h2 class="modal-title">Registrar Nueva Cuenta de Personal</h2>
-          <p class="modal-subtitle">Crea un nuevo usuario administrativo con rol de Coordinador o Administrador.</p>
+          <h2 class="modal-title">{{ tituloModal }}</h2>
+          <p class="modal-subtitle">
+            {{ props.modoEdicion ? 'Modifica los datos personales, el rol o actualiza la clave de acceso.' : 'Crea un nuevo usuario administrativo con rol de Coordinador o Administrador.' }}
+          </p>
         </div>
         <button class="modal-close-btn" @click="emit('cerrar')" aria-label="Cerrar">&times;</button>
       </div>
@@ -108,13 +141,15 @@ function manejarEnvio() {
 
         <div class="form-grid">
           <div class="form-group">
-            <label class="form-label" for="user-pass">Contraseña Inicial *</label>
+            <label class="form-label" for="user-pass">
+              {{ props.modoEdicion ? 'Nueva Contraseña (Opcional)' : 'Contraseña Inicial *' }}
+            </label>
             <input 
               id="user-pass" 
               v-model="formulario.password" 
               type="password" 
               class="form-input" 
-              placeholder="Mínimo 6 caracteres"
+              :placeholder="props.modoEdicion ? 'Dejar vacío para conservar actual' : 'Mínimo 6 caracteres'"
               :class="{ 'is-invalid': errores.password }"
             />
             <span v-if="errores.password" class="form-error">{{ errores.password }}</span>
@@ -134,8 +169,8 @@ function manejarEnvio() {
             Cancelar
           </button>
           <button type="submit" class="btn btn-primary" :disabled="props.cargando">
-            <span v-if="props.cargando">Creando cuenta...</span>
-            <span v-else>Crear Cuenta</span>
+            <span v-if="props.cargando">Guardando cuenta...</span>
+            <span v-else>{{ props.modoEdicion ? 'Actualizar Cuenta' : 'Crear Cuenta' }}</span>
           </button>
         </div>
       </form>

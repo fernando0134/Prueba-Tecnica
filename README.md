@@ -115,10 +115,10 @@ Prueba-Tecnica/
 │   └── package.json
 ├── frontend/
 │   ├── src/
-│   │   ├── components/                 # Navbar, DocenteModal, AsignaturaModal, ConfirmModal, Toast
-│   │   ├── views/                      # LoginView, DocentesView, AsignaturasView
+│   │   ├── components/                 # Navbar, DocenteModal, AsignaturaModal, AsignaturaDetalleModal, UsuarioModal, UsuarioDetalleModal, ConfirmModal, Toast
+│   │   ├── views/                      # LoginView, DocentesView, AsignaturasView, UsuariosView
 │   │   ├── services/                   # api.js (inyecta JWT), authService.js, docenteService.js, asignaturaService.js
-│   │   ├── router/index.js             # Vue Router con guardianes de navegación
+│   │   ├── router/index.js             # Vue Router con guardianes de navegación y RBAC
 │   │   ├── App.vue
 │   │   └── main.js
 │   └── vite.config.js                  # Proxy inverso a /api
@@ -193,7 +193,7 @@ npm run dev      # Inicia el cliente Vue 3 en http://localhost:5173
 
 ```bash
 npm run seed:backend   # Resetear y sembrar datos de prueba
-npm run test:backend   # Ejecutar batería de 10 pruebas automatizadas
+npm run test:backend   # Ejecutar batería de 14 pruebas automatizadas integrales
 npm run dev:backend    # Levantar backend Express
 npm run dev:frontend   # Levantar frontend Vue 3
 npm run build:frontend # Compilar frontend para producción
@@ -225,6 +225,13 @@ npm run build:frontend # Compilar frontend para producción
 ### 4. Reportes (`/api/reportes`)
 - `GET /api/reportes/docentes/csv` - Descarga directa del archivo Excel/CSV.
 - `GET /api/reportes/estadisticas` - Resumen estadístico de carga académica.
+
+### 5. Gobernanza y Cuentas de Personal (`/api/usuarios` - Exclusivo Rol `ADMIN`)
+- `GET /api/usuarios` - Listado institucional de todas las cuentas del sistema.
+- `GET /api/usuarios/:id` - Ficha técnica y detalle completo de cuenta de usuario.
+- `POST /api/usuarios` - Registrar nueva cuenta de personal (Coordinador o Administrador).
+- `PUT /api/usuarios/:id` - Actualizar información de cuenta (nombre, correo único, rol y cambio opcional de contraseña).
+- `PATCH /api/usuarios/:id/estado` - Alternar estado activo/suspendido (con bloqueo de auto-suspensión de cuenta propia).
 
 ---
 

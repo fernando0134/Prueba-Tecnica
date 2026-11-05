@@ -191,8 +191,38 @@ const ejecutarPruebas = async () => {
     assert.ok(contentType.includes('text/csv'));
     console.log('   ✅ Reporte CSV generado y formateado para Excel correctamente.');
 
+    // 13. Gobernanza de Usuarios: Consultar ficha técnica por ID
+    console.log('👉 [Test 13]: Probando GET /api/usuarios/:id (Consultar ficha técnica de usuario)');
+    const resFichaUser = await fetch(`${baseUrl}/usuarios/2`, {
+      headers: { Authorization: `Bearer ${adminToken}` },
+    });
+    const dataFichaUser = await resFichaUser.json();
+    assert.strictEqual(resFichaUser.status, 200);
+    assert.strictEqual(dataFichaUser.data.id, 2);
+    assert.strictEqual(dataFichaUser.data.email, 'coordinador@universidad.edu');
+    console.log(`   ✅ Ficha de usuario obtenida: ${dataFichaUser.data.nombre} (${dataFichaUser.data.rol})`);
+
+    // 14. Gobernanza de Usuarios: Actualizar cuenta de usuario
+    console.log('👉 [Test 14]: Probando PUT /api/usuarios/:id (Actualizar nombre y datos de cuenta)');
+    const resActUser = await fetch(`${baseUrl}/usuarios/2`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${adminToken}`,
+      },
+      body: JSON.stringify({
+        nombre: 'Coordinador Académico Principal',
+        email: 'coordinador@universidad.edu',
+        rol: 'COORDINADOR',
+      }),
+    });
+    const dataActUser = await resActUser.json();
+    assert.strictEqual(resActUser.status, 200);
+    assert.strictEqual(dataActUser.data.nombre, 'Coordinador Académico Principal');
+    console.log(`   ✅ Cuenta actualizada con éxito: ${dataActUser.data.nombre}`);
+
     console.log('========================================================================');
-    console.log('🎉 [Test Suite]: ¡TODAS LAS PRUEBAS (12/12) PASARON CON TOTAL ÉXITO!');
+    console.log('🎉 [Test Suite]: ¡TODAS LAS PRUEBAS (14/14) PASARON CON TOTAL ÉXITO!');
     console.log('========================================================================');
 
     server.close();
